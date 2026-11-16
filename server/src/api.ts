@@ -1,6 +1,10 @@
+
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import multer from "multer";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { all, one, run, tx, type Row } from "./db.js";
@@ -11,6 +15,146 @@ export const api = Router();
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { error: "Muitas tentativas. Aguarde alguns minutos." } });
 const formLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { error: "Muitas solicitações. Aguarde alguns minutos." } });
+
+// ───────────────────────── Fotos de perfil ─────────────────────────
+
+const DATA_DIR = process.env.DATA_DIR || path.resolve("data");
+const AVATAR_DIR = path.join(DATA_DIR, "avatars");
+
+fs.mkdirSync(AVATAR_DIR, { recursive: true });
+
+const avatarStorage = multer.memoryStorage();
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(new Error("Formato inválido. Envie uma imagem JPEG, PNG ou WebP."));
+    }
+    callback(null, true);
+  },
+}).single("avatar");
+
+function handleAvatarUpload(req: any, res: any, next: any) {
+  avatarUpload(req, res, (error: any) => {
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ error: "A imagem deve ter no máximo 5 MB." });
+      }
+      return res.status(400).json({ error: "Não foi possível receber a imagem." });
+    }
+    if (error) {
+      return res.status(400).json({ error: error.message || "Imagem inválida." });
+    }
+    next();
+  });
+}
+
+function detectAvatarFormat(buffer: Buffer): { extension: string; mime: string } | null {
+  // JPEG
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return { extension: "jpg", mime: "image/jpeg" };
+  }
+
+  // PNG
+  if (
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  ) {
+    return { extension: "png", mime: "image/png" };
+  }
+
+  // WebP
+  if (
+    buffer.length >= 12 &&
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return { extension: "webp", mime: "image/webp" };
+  }
+
+  return null;
+}
+
+function deleteAvatarFile(url: string) {
+  const match = url.match(/^\/uploads\/avatars\/([a-f0-9-]{36}\.(?:jpg|png|webp))$/i);
+  if (!match) return;
+
+  const file = path.join(AVATAR_DIR, match[1]);
+
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+}
+
+api.post("/me/avatar", requireAuth, handleAvatarUpload, h((req, res) => {
+  const file = (req as any).file;
+
+  if (!file || !file.buffer) {
+    return res.status(400).json({ error: "Selecione uma imagem para enviar." });
+  }
+
+  const format = detectAvatarFormat(file.buffer);
+
+  if (!format) {
+    return res.status(400).json({ error: "O arquivo não é uma imagem JPEG, PNG ou WebP válida." });
+  }
+
+  const filename = `${crypto.randomUUID()}.${format.extension}`;
+  const filePath = path.join(AVATAR_DIR, filename);
+  const avatarUrl = `/uploads/avatars/${filename}`;
+
+  const oldUser = one("SELECT avatar_url FROM users WHERE id = ?", req.user!.id);
+  const oldAvatar = String(oldUser?.avatar_url || "");
+
+  fs.writeFileSync(filePath, file.buffer);
+
+  try {
+    run(
+      "UPDATE users SET avatar_url = ?, updated_at = datetime('now') WHERE id = ?",
+      avatarUrl,
+      req.user!.id
+    );
+  } catch (error) {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    throw error;
+  }
+
+  deleteAvatarFile(oldAvatar);
+
+  const updatedUser = one("SELECT * FROM users WHERE id = ?", req.user!.id)!;
+
+  res.json({
+    ok: true,
+    user: publicUser(updatedUser),
+  });
+}));
+
+api.delete("/me/avatar", requireAuth, h((req, res) => {
+  const current = one("SELECT avatar_url FROM users WHERE id = ?", req.user!.id);
+  const oldAvatar = String(current?.avatar_url || "");
+
+  run(
+    "UPDATE users SET avatar_url = '', updated_at = datetime('now') WHERE id = ?",
+    req.user!.id
+  );
+
+  deleteAvatarFile(oldAvatar);
+
+  const updatedUser = one("SELECT * FROM users WHERE id = ?", req.user!.id)!;
+
+  res.json({
+    ok: true,
+    user: publicUser(updatedUser),
+  });
+}));
 
 // ───────────────────────── Conteúdo público ─────────────────────────
 
@@ -46,6 +190,7 @@ api.get("/stats", h((_req, res) => {
 }));
 
 const CARD_FIELDS = `p.id, p.slug, p.display_name, p.profession, p.bio, p.city, p.neighborhood, p.price_range,
+  u.avatar_url AS avatar_url,
   c.name AS category_name, c.slug AS category_slug, s.name AS school_name,
   (SELECT ROUND(AVG(rating),1) FROM reviews r WHERE r.profile_id = p.id AND r.status = 'visible') AS rating,
   (SELECT COUNT(*) FROM reviews r WHERE r.profile_id = p.id AND r.status = 'visible') AS review_count`;
@@ -219,7 +364,6 @@ api.post("/auth/forgot", authLimiter, h((req, res) => {
   const u = one("SELECT id FROM users WHERE email = ?", email);
   if (u && !one("SELECT id FROM password_resets WHERE user_id = ? AND status = 'requested'", u.id))
     run("INSERT INTO password_resets (user_id) VALUES (?)", u.id);
-  // Resposta igual exista ou não a conta, para não revelar e-mails cadastrados.
   res.json({ ok: true });
 }));
 
@@ -259,7 +403,6 @@ api.put("/me", requireAuth, h((req, res) => {
   if (!one("SELECT id FROM schools WHERE id = ? AND status = 'active'", b.school_id))
     return res.status(400).json({ error: "Escola inválida." });
   const u = req.user!;
-  // Trocar de escola exige nova verificação do vínculo.
   const schoolChanged = u.school_id !== b.school_id && !u.is_admin;
   run(
     `UPDATE users SET name = ?, phone = ?, school_id = ?, updated_at = datetime('now')${schoolChanged ? ", status = 'pending', status_reason = ''" : ""} WHERE id = ?`,
@@ -432,6 +575,6 @@ api.post("/reports", requireApproved, formLimiter, h((req, res) => {
     target_id: z.coerce.number().int().positive(),
     reason: zText(1000, 5),
   }).parse(req.body);
-  run("INSERT INTO reports (reporter_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)", req.user!.id, b.target_type, b.target_id, b.reason);
+    run("INSERT INTO reports (reporter_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)", req.user!.id, b.target_type, b.target_id, b.reason);
   res.status(201).json({ ok: true });
 }));
