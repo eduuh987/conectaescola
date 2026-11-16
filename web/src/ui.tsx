@@ -288,7 +288,7 @@ export function ReportButton({ type, id, label = "Denunciar" }: { type: "profile
 
 export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
   return (
-    <section className="border-b border-line bg-gradient-to-br from-cream-2 via-cream to-mustard-light/40">
+    <section className="border-b border-line bg-gradient-to-br from-sky-100 via-sky-50 to-brand-light/40">
       <div className="container-x py-10 sm:py-14">
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
         <h1 className="text-3xl font-extrabold sm:text-4xl">{title}</h1>
