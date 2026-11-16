@@ -1,3 +1,4 @@
+
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
@@ -28,6 +29,7 @@ export type AuthUser = {
   is_admin: number;
   status: "pending" | "approved" | "rejected" | "suspended";
   status_reason: string;
+  avatar_url: string;
 };
 
 declare global {
@@ -58,7 +60,7 @@ export function loadUser(req: Request, _res: Response, next: NextFunction) {
     try {
       const { uid } = jwt.verify(token, SECRET) as { uid: number };
       const u = one(
-        "SELECT id, name, email, phone, school_id, is_family, is_professional, is_admin, status, status_reason FROM users WHERE id = ?",
+        "SELECT id, name, email, phone, school_id, is_family, is_professional, is_admin, status, status_reason, avatar_url FROM users WHERE id = ?",
         uid
       );
       if (u) req.user = u as AuthUser;
@@ -102,5 +104,7 @@ export function publicUser(u: Row | AuthUser) {
     is_admin: !!u.is_admin,
     status: u.status,
     status_reason: u.status_reason,
+    avatar_url: u.avatar_url || "",
   };
 }
+
