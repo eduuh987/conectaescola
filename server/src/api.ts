@@ -16,17 +16,35 @@ export const api = Router();
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { error: "Muitas tentativas. Aguarde alguns minutos." } });
 const formLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { error: "Muitas solicitações. Aguarde alguns minutos." } });
 
-// ───────────────────────── Fotos de perfil ─────────────────────────
+// ───────────────────────── Fotos de perfil e portfólio ─────────────────────────
 
 const DATA_DIR = process.env.DATA_DIR || path.resolve("data");
 const AVATAR_DIR = path.join(DATA_DIR, "avatars");
+const PORTFOLIO_DIR = path.join(DATA_DIR, "portfolio");
 
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
+fs.mkdirSync(PORTFOLIO_DIR, { recursive: true });
 
-const avatarStorage = multer.memoryStorage();
+const imageStorage = multer.memoryStorage();
+
+function createImageUpload(fieldName: string, maxFiles: number) {
+  const upload = multer({
+    storage: imageStorage,
+    limits: { fileSize: 5 * 1024 * 1024, files: maxFiles },
+    fileFilter: (_req, file, callback) => {
+      const allowed = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowed.includes(file.mimetype)) {
+        return callback(new Error("Formato inválido. Envie uma imagem JPEG, PNG ou WebP."));
+      }
+      callback(null, true);
+    },
+  });
+
+  return upload.array(fieldName, maxFiles);
+}
 
 const avatarUpload = multer({
-  storage: avatarStorage,
+  storage: imageStorage,
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
     const allowed = ["image/jpeg", "image/png", "image/webp"];
@@ -36,6 +54,8 @@ const avatarUpload = multer({
     callback(null, true);
   },
 }).single("avatar");
+
+const portfolioUpload = createImageUpload("images", 8);
 
 function handleAvatarUpload(req: any, res: any, next: any) {
   avatarUpload(req, res, (error: any) => {
@@ -52,7 +72,25 @@ function handleAvatarUpload(req: any, res: any, next: any) {
   });
 }
 
-function detectAvatarFormat(buffer: Buffer): { extension: string; mime: string } | null {
+function handlePortfolioUpload(req: any, res: any, next: any) {
+  portfolioUpload(req, res, (error: any) => {
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ error: "Cada imagem deve ter no máximo 5 MB." });
+      }
+      if (error.code === "LIMIT_FILE_COUNT") {
+        return res.status(400).json({ error: "Envie no máximo 8 imagens por vez." });
+      }
+      return res.status(400).json({ error: "Não foi possível receber as imagens." });
+    }
+    if (error) {
+      return res.status(400).json({ error: error.message || "Imagem inválida." });
+    }
+    next();
+  });
+}
+
+function detectImageFormat(buffer: Buffer): { extension: string; mime: string } | null {
   // JPEG
   if (
     buffer.length >= 3 &&
@@ -94,6 +132,18 @@ function deleteAvatarFile(url: string) {
   }
 }
 
+function deletePortfolioFile(url: string) {
+  const match = url.match(/^\/uploads\/portfolio\/([a-f0-9-]{36}\.(?:jpg|png|webp))$/i);
+  if (!match) return;
+
+  const file = path.join(PORTFOLIO_DIR, match[1]);
+
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+}
+
+// Upload de foto de perfil.
 api.post("/me/avatar", requireAuth, handleAvatarUpload, h((req, res) => {
   const file = (req as any).file;
 
@@ -101,7 +151,7 @@ api.post("/me/avatar", requireAuth, handleAvatarUpload, h((req, res) => {
     return res.status(400).json({ error: "Selecione uma imagem para enviar." });
   }
 
-  const format = detectAvatarFormat(file.buffer);
+  const format = detectImageFormat(file.buffer);
 
   if (!format) {
     return res.status(400).json({ error: "O arquivo não é uma imagem JPEG, PNG ou WebP válida." });
@@ -154,6 +204,131 @@ api.delete("/me/avatar", requireAuth, h((req, res) => {
     ok: true,
     user: publicUser(updatedUser),
   });
+}));
+
+// Envia imagens para o portfólio do profissional.
+api.post("/me/portfolio", requireAuth, handlePortfolioUpload, h((req, res) => {
+  const profile = one(
+    "SELECT id FROM professional_profiles WHERE user_id = ?",
+    req.user!.id
+  );
+
+  if (!profile) {
+    return res.status(400).json({ error: "Crie seu perfil profissional primeiro." });
+  }
+
+  const files = (req as any).files as Express.Multer.File[] | undefined;
+
+  if (!files || files.length === 0) {
+    return res.status(400).json({ error: "Selecione pelo menos uma imagem." });
+  }
+
+  const currentCount = Number(
+    one("SELECT COUNT(*) AS c FROM portfolio_images WHERE profile_id = ?", profile.id)?.c || 0
+  );
+
+  if (currentCount + files.length > 8) {
+    return res.status(400).json({
+      error: `Seu portfólio permite até 8 fotos. Você já possui ${currentCount}.`,
+    });
+  }
+
+  const prepared = files.map((file) => {
+    const format = detectImageFormat(file.buffer);
+
+    if (!format) {
+      return null;
+    }
+
+    return {
+      buffer: file.buffer,
+      filename: `${crypto.randomUUID()}.${format.extension}`,
+    };
+  });
+
+  if (prepared.some((item) => item === null)) {
+    return res.status(400).json({
+      error: "Uma ou mais imagens não são arquivos JPEG, PNG ou WebP válidos.",
+    });
+  }
+
+  const savedFiles: string[] = [];
+
+  try {
+    tx(() => {
+      const insert = dbInsertPortfolioImage();
+
+      for (const item of prepared) {
+        if (!item) continue;
+
+        const imageUrl = `/uploads/portfolio/${item.filename}`;
+        const filePath = path.join(PORTFOLIO_DIR, item.filename);
+
+        fs.writeFileSync(filePath, item.buffer);
+        savedFiles.push(filePath);
+
+        insert(profile.id, imageUrl);
+      }
+    });
+  } catch (error) {
+    for (const filePath of savedFiles) {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    throw error;
+  }
+
+  const images = all(
+    "SELECT id, image_url, created_at FROM portfolio_images WHERE profile_id = ? ORDER BY id",
+    profile.id
+  );
+
+  res.status(201).json({ ok: true, images });
+}));
+
+function dbInsertPortfolioImage() {
+  const statement = dbPreparePortfolioImage();
+  return (profileId: number, imageUrl: string) => {
+    statement(profileId, imageUrl);
+  };
+}
+
+function dbPreparePortfolioImage() {
+  return (profileId: number, imageUrl: string) => {
+    run(
+      "INSERT INTO portfolio_images (profile_id, image_url) VALUES (?, ?)",
+      profileId,
+      imageUrl
+    );
+  };
+}
+
+// Remove uma imagem do portfólio, somente se pertencer ao profissional autenticado.
+api.delete("/me/portfolio/:id", requireAuth, h((req, res) => {
+  const profile = myProfile(req.user!.id);
+
+  if (!profile) {
+    return res.status(404).json({ error: "Perfil profissional não encontrado." });
+  }
+
+  const image = one(
+    "SELECT id, image_url FROM portfolio_images WHERE id = ? AND profile_id = ?",
+    int(req.params.id),
+    profile.id
+  );
+
+  if (!image) {
+    return res.status(404).json({ error: "Imagem não encontrada." });
+  }
+
+  run(
+    "DELETE FROM portfolio_images WHERE id = ? AND profile_id = ?",
+    image.id,
+    profile.id
+  );
+
+  deletePortfolioFile(String(image.image_url));
+
+  res.json({ ok: true });
 }));
 
 // ───────────────────────── Conteúdo público ─────────────────────────
@@ -245,6 +420,10 @@ api.get("/professionals/:slug", h((req, res) => {
   const viewer = req.user;
   const canContact = viewer?.status === "approved";
   const services = all("SELECT id, title, description, price FROM services WHERE profile_id = ? ORDER BY id", p.id);
+  const portfolio = all(
+    "SELECT id, image_url, created_at FROM portfolio_images WHERE profile_id = ? ORDER BY id",
+    p.id
+  );
   const reviews = all(
     `SELECT r.id, r.rating, r.comment, r.created_at, r.author_id, u.name AS author_name
      FROM reviews r JOIN users u ON u.id = r.author_id
@@ -256,6 +435,7 @@ api.get("/professionals/:slug", h((req, res) => {
   res.json({
     ...rest,
     services,
+    portfolio,
     reviews: reviews.map(({ author_id, ...r }) => r),
     is_owner: viewer?.id === user_id,
     can_contact: canContact,
@@ -386,6 +566,9 @@ api.get("/me", requireAuth, h((req, res) => {
   const school = u.school_id ? one("SELECT id, name FROM schools WHERE id = ?", u.school_id) : null;
   const profile = one("SELECT * FROM professional_profiles WHERE user_id = ?", u.id);
   const services = profile ? all("SELECT id, title, description, price FROM services WHERE profile_id = ? ORDER BY id", profile.id) : [];
+  const portfolio = profile
+    ? all("SELECT id, image_url, created_at FROM portfolio_images WHERE profile_id = ? ORDER BY id", profile.id)
+    : [];
   const sentQuotes = all(
     `SELECT q.id, q.description, q.status, q.created_at, p.display_name, p.slug
      FROM quote_requests q JOIN professional_profiles p ON p.id = q.profile_id WHERE q.family_id = ? ORDER BY q.created_at DESC`, u.id);
@@ -395,7 +578,7 @@ api.get("/me", requireAuth, h((req, res) => {
          FROM quote_requests q JOIN users u ON u.id = q.family_id WHERE q.profile_id = ? ORDER BY q.created_at DESC`, profile.id)
     : [];
   const partnerships = all("SELECT id, title, status, created_at FROM partnership_posts WHERE author_id = ? AND status != 'hidden' ORDER BY created_at DESC", u.id);
-  res.json({ user: publicUser(u), school, profile: profile || null, services, sentQuotes, receivedQuotes, partnerships });
+  res.json({ user: publicUser(u), school, profile: profile || null, services, portfolio, sentQuotes, receivedQuotes, partnerships });
 }));
 
 api.put("/me", requireAuth, h((req, res) => {
@@ -575,6 +758,6 @@ api.post("/reports", requireApproved, formLimiter, h((req, res) => {
     target_id: z.coerce.number().int().positive(),
     reason: zText(1000, 5),
   }).parse(req.body);
-    run("INSERT INTO reports (reporter_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)", req.user!.id, b.target_type, b.target_id, b.reason);
+  run("INSERT INTO reports (reporter_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)", req.user!.id, b.target_type, b.target_id, b.reason);
   res.status(201).json({ ok: true });
 }));
