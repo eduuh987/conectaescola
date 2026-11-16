@@ -1,3 +1,4 @@
+
 import { useEffect, useState, type ReactNode, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -193,14 +194,27 @@ export type ProCard = {
   category_name: string | null;
   rating: number | null;
   review_count: number;
+  avatar_url?: string;
 };
 
 export function ProfessionalCard({ p }: { p: ProCard }) {
   const place = [p.neighborhood, p.city].filter(Boolean).join(", ");
+
   return (
     <article className="card flex flex-col p-4 transition hover:-translate-y-0.5 hover:shadow-pop">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-light font-display text-sm font-bold text-brand">{initials(p.display_name)}</span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-brand-light font-display text-sm font-bold text-brand">
+          {p.avatar_url ? (
+            <img
+              src={p.avatar_url}
+              alt={`Foto de ${p.display_name}`}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials(p.display_name)
+          )}
+        </span>
+
         <div className="min-w-0">
           {p.category_name && <p className="eyebrow !text-[10px] !tracking-[0.1em]">{p.category_name}</p>}
           <h3 className="truncate font-display text-[15px] font-bold">{p.display_name}</h3>
@@ -283,3 +297,4 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; tit
     </section>
   );
 }
+
