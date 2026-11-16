@@ -10,7 +10,7 @@ RUN npm run build
 FROM node:22-alpine AS server
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm ci
+RUN npm install
 COPY server/ ./
 RUN npm run build && npm prune --omit=dev
 
