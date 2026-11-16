@@ -25,7 +25,7 @@ export const ICON_OPTIONS = Object.keys(ICONS);
 export function CategoryIcon({ icon, className = "" }: { icon?: string; className?: string }) {
   const I = ICONS[icon || "tag"] || Tag;
   return (
-    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mustard-light text-ink/70 ${className}`}>
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sky-400 text-white ${className}`}>
       <I size={16} strokeWidth={1.8} />
     </span>
   );
@@ -297,4 +297,3 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; tit
     </section>
   );
 }
-
