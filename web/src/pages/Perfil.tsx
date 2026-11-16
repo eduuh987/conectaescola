@@ -12,6 +12,7 @@ type Profile = {
   category_name: string | null; category_slug: string | null; school_name: string | null;
   rating: number | null; review_count: number; avatar_url?: string;
   services: { id: number; title: string; description: string; price: string }[];
+  portfolio: { id: number; image_url: string; created_at: string }[];
   reviews: { id: number; rating: number; comment: string; created_at: string; author_name: string }[];
   is_owner: boolean; can_contact: boolean; whatsapp: string | null; has_whatsapp: boolean;
   my_review: { id: number; rating: number; comment: string } | null;
@@ -99,6 +100,35 @@ export default function Perfil() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section className="card p-6 sm:p-8">
+            <h2 className="text-lg font-bold">Portfólio</h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              Conheça alguns trabalhos realizados por este profissional.
+            </p>
+
+            {!p.portfolio || p.portfolio.length === 0 ? (
+              <p className="mt-4 text-sm text-ink-soft">
+                Este profissional ainda não adicionou fotos ao portfólio.
+              </p>
+            ) : (
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {p.portfolio.map((photo) => (
+                  <div
+                    key={photo.id}
+                    className="group aspect-square overflow-hidden rounded-xl bg-cream"
+                  >
+                    <img
+                      src={photo.image_url}
+                      alt={`Trabalho realizado por ${p.display_name}`}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
+                ))}
+              </div>
             )}
           </section>
 
@@ -276,4 +306,3 @@ function ReviewModal({ open, onClose, slug, current, onSaved }: { open: boolean;
     </Modal>
   );
 }
-
