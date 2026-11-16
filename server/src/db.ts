@@ -161,6 +161,15 @@ const migrations: string[] = [
     ('Marcenaria', 'marcenaria', 'Móveis, montagem e reparos em madeira', 'paintbrush'),
     ('Outros serviços', 'outros-servicos', 'Atividades profissionais que não se encaixam nas demais categorias', 'tag');
   `,
+  `
+  CREATE TABLE portfolio_images (
+    id INTEGER PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX idx_portfolio_images_profile ON portfolio_images(profile_id);
+  `,
 ];
 
 db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))");
@@ -251,4 +260,3 @@ export function tx<T>(fn: () => T): T {
     throw e;
   }
 }
-
