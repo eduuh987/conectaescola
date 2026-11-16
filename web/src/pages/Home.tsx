@@ -24,7 +24,7 @@ export default function Home() {
   const [q, setQ] = useState("");
   const cats = useApi<Cat[]>("/categories");
   const pros = useApi<{ items: ProCard[] }>("/professionals?ordem=recentes");
-  const schoolName = (school?.name || "nossa escola").toLocaleLowerCase("pt-BR");
+  const schoolName = "E.E Vila São Joaquim II";
 
   return (
     <>
@@ -161,8 +161,8 @@ export default function Home() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(cats.data || Array.from({ length: 9 }).map(() => null))
-              .slice(0, 9)
+            {(cats.data || Array.from({ length: 6 }).map(() => null))
+              .slice(0, 6)
               .map((c, i) =>
                 c ? (
                   <Link
@@ -170,7 +170,7 @@ export default function Home() {
                     to={`/profissionais?categoria=${c.slug}`}
                     className="group flex items-center gap-4 rounded-2xl border border-line bg-white p-4 shadow-card transition duration-200 hover:-translate-y-1 hover:border-brand/30 hover:shadow-pop"
                   >
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-100 text-white transition group-hover:bg-brand">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 transition group-hover:bg-brand-light">
                       <CategoryIcon icon={c.icon} />
                     </div>
 
@@ -193,40 +193,6 @@ export default function Home() {
                   />
                 )
               )}
-          </div>
-        </div>
-      </section>
-
-      {/* Convite para profissionais */}
-      <section className="py-16 sm:py-20">
-        <div className="container-x">
-          <div className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-brand to-blue-800 px-7 py-10 shadow-pop sm:px-10 sm:py-12">
-            <div className="dots absolute inset-0 -z-10 opacity-60" />
-            <div className="absolute -right-16 -top-20 -z-10 h-64 w-64 rounded-full border-[35px] border-white/10" />
-
-            <div className="relative flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
-              <div className="max-w-2xl">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-100">
-                  <Sparkles size={13} />
-                  Faça parte da rede
-                </span>
-
-                <h2 className="mt-5 text-2xl font-extrabold leading-tight text-white sm:text-3xl">
-                  Seu trabalho pode ser reconhecido.
-                </h2>
-
-                <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
-                  Crie seu perfil, apresente seus serviços e conecte-se com famílias e oportunidades da comunidade escolar.
-                </p>
-              </div>
-
-              <Link
-                to="/cadastro?profissional=1"
-                className="btn-mustard shrink-0 !rounded-xl !px-6 !py-3.5"
-              >
-                Quero participar <ArrowRight size={16} />
-              </Link>
-            </div>
           </div>
         </div>
       </section>
@@ -331,6 +297,40 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Convite para profissionais */}
+      <section className="py-16 sm:py-20">
+        <div className="container-x">
+          <div className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-brand to-blue-800 px-7 py-10 shadow-pop sm:px-10 sm:py-12">
+            <div className="dots absolute inset-0 -z-10 opacity-60" />
+            <div className="absolute -right-16 -top-20 -z-10 h-64 w-64 rounded-full border-[35px] border-white/10" />
+
+            <div className="relative flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
+              <div className="max-w-2xl">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-100">
+                  <Sparkles size={13} />
+                  Faça parte da rede
+                </span>
+
+                <h2 className="mt-5 text-2xl font-extrabold leading-tight text-white sm:text-3xl">
+                  Seu trabalho merece ser conhecido.
+                </h2>
+
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
+                  Crie seu perfil, apresente seus serviços e conecte-se com famílias e oportunidades da comunidade escolar.
+                </p>
+              </div>
+
+              <Link
+                to="/cadastro?profissional=1"
+                className="btn-mustard shrink-0 !rounded-xl !px-6 !py-3.5"
+              >
+                Quero participar <ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </>
