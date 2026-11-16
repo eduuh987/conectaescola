@@ -46,7 +46,7 @@ export default function Home() {
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
-              O ConectaEscola aproxima famílias e profissionais da comunidade de {schoolName}, criando oportunidades e fortalecendo relações.
+              O Conecta Escola aproxima famílias e profissionais da comunidade de {schoolName}, criando oportunidades e fortalecendo relações.
             </p>
 
             <form
