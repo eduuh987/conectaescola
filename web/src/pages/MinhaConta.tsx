@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Clock, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { api, formatDate, maskPhone, useApi, useAuth, usePageTitle, whatsappLink, type User } from "../lib";
+import { Camera, Clock, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { api, apiUpload, formatDate, maskPhone, useApi, useAuth, usePageTitle, whatsappLink, type User } from "../lib";
 import { Alert, Empty, ErrorState, Field, Input, Modal, Spinner, StatusBadge, Textarea } from "../ui";
 
 type Service = { id: number; title: string; description: string; price: string };
@@ -98,67 +99,207 @@ function StatusCard({ me, onChange, isNew }: { me: Me; onChange: () => void; isN
   );
 }
 
+function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [avatarUrl, setAvatarUrl] = useState(user.avatar_url || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    setAvatarUrl(user.avatar_url || "");
+  }, [user.avatar_url]);
+
+  async function choosePhoto(file?: File) {
+    if (!file) return;
+
+    setError("");
+    setSuccess("");
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError("Escolha uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 5 MB.");
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const result = await apiUpload<{ ok: boolean; user: User }>("/me/avatar", file);
+      setAvatarUrl(result.user.avatar_url || "");
+      setSuccess("Foto de perfil atualizada!");
+      onSaved();
+    } catch (e: any) {
+      setError(e.message || "Não foi possível enviar a foto.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function removePhoto() {
+    if (!confirm("Deseja realmente remover sua foto de perfil?")) return;
+
+    setBusy(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api("/me/avatar", { method: "DELETE" });
+      setAvatarUrl("");
+      setSuccess("Foto removida.");
+      onSaved();
+    } catch (e: any) {
+      setError(e.message || "Não foi possível remover a foto.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const initials = user.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+
+  return (
+    <section className="card p-6">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-brand-light font-display text-2xl font-extrabold text-brand">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={`Foto de perfil de ${user.name}`}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">Foto de perfil</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Escolha uma foto sua para deixar sua conta mais pessoal e facilitar sua identificação na comunidade.
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => choosePhoto(e.target.files?.[0])}
+            />
+
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={busy}
+              onClick={() => inputRef.current?.click()}
+            >
+              <Camera size={16} />
+              {busy ? "Aguarde..." : avatarUrl ? "Trocar foto" : "Escolher foto"}
+            </button>
+
+            {avatarUrl && (
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={busy}
+                onClick={removePhoto}
+              >
+                <Trash2 size={16} />
+                Remover
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
+      {success && <div className="mt-4"><Alert kind="success">{success}</Alert></div>}
+
+      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">
+        Formatos aceitos: JPG, PNG e WebP. Tamanho máximo: 5 MB. Ao adicionar uma foto, você concorda que ela poderá ficar visível publicamente no Conecta Escola, inclusive no seu perfil profissional.
+      </p>
+    </section>
+  );
+}
+
 function AccountTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
   const [f, setF] = useState({ name: me.user.name, phone: maskPhone(me.user.phone) });
   const [st, setSt] = useState<{ busy?: boolean; err?: string; ok?: string; fields?: Record<string, string> }>({});
   const [pw, setPw] = useState({ current: "", password: "" });
   const [pst, setPst] = useState<{ busy?: boolean; err?: string; ok?: boolean; fields?: Record<string, string> }>({});
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <form
-        className="card space-y-4 p-6"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setSt({ busy: true });
-          try {
-            await api("/me", { method: "PUT", body: { ...f, school_id: me.user.school_id } });
-            setSt({ ok: "Dados atualizados." });
-            onSaved();
-          } catch (e: any) {
-            setSt({ err: e.message, fields: e.fields });
-          }
-        }}
-      >
-        <h2 className="text-lg font-bold">Dados da conta</h2>
-        {st.err && <Alert>{st.err}</Alert>}
-        {st.ok && <Alert kind="success">{st.ok}</Alert>}
-        <Field id="a-name" label="Nome completo" error={st.fields?.name}>
-          <Input id="a-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} error={st.fields?.name} />
-        </Field>
-        <Field id="a-email" label="E-mail" hint="Para trocar o e-mail, fale com a equipe da escola.">
-          <Input id="a-email" value={me.user.email} disabled className="bg-cream-2" />
-        </Field>
-        <Field id="a-phone" label="Telefone / WhatsApp" error={st.fields?.phone}>
-          <Input id="a-phone" type="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: maskPhone(e.target.value) })} error={st.fields?.phone} />
-        </Field>
-        <button className="btn-primary" disabled={st.busy}>{st.busy ? "Salvando…" : "Salvar"}</button>
-      </form>
 
-      <form
-        className="card space-y-4 p-6 lg:self-start"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setPst({ busy: true });
-          try {
-            await api("/me/password", { method: "PUT", body: pw });
-            setPst({ ok: true });
-            setPw({ current: "", password: "" });
-          } catch (e: any) {
-            setPst({ err: e.message, fields: e.fields });
-          }
-        }}
-      >
-        <h2 className="text-lg font-bold">Trocar senha</h2>
-        {pst.err && <Alert>{pst.err}</Alert>}
-        {pst.ok && <Alert kind="success">Senha alterada.</Alert>}
-        <Field id="p-cur" label="Senha atual" error={pst.fields?.current}>
-          <Input id="p-cur" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} error={pst.fields?.current} />
-        </Field>
-        <Field id="p-new" label="Nova senha" hint="Mínimo de 8 caracteres." error={pst.fields?.password}>
-          <Input id="p-new" type="password" autoComplete="new-password" value={pw.password} onChange={(e) => setPw({ ...pw, password: e.target.value })} error={pst.fields?.password} />
-        </Field>
-        <button className="btn-ghost" disabled={pst.busy}>Alterar senha</button>
-      </form>
+  return (
+    <div className="space-y-6">
+      <AvatarEditor user={me.user} onSaved={onSaved} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <form
+          className="card space-y-4 p-6"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSt({ busy: true });
+            try {
+              await api("/me", { method: "PUT", body: { ...f, school_id: me.user.school_id } });
+              setSt({ ok: "Dados atualizados." });
+              onSaved();
+            } catch (e: any) {
+              setSt({ err: e.message, fields: e.fields });
+            }
+          }}
+        >
+          <h2 className="text-lg font-bold">Dados da conta</h2>
+          {st.err && <Alert>{st.err}</Alert>}
+          {st.ok && <Alert kind="success">{st.ok}</Alert>}
+          <Field id="a-name" label="Nome completo" error={st.fields?.name}>
+            <Input id="a-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} error={st.fields?.name} />
+          </Field>
+          <Field id="a-email" label="E-mail" hint="Para trocar o e-mail, fale com a equipe da escola.">
+            <Input id="a-email" value={me.user.email} disabled className="bg-cream-2" />
+          </Field>
+          <Field id="a-phone" label="Telefone / WhatsApp" error={st.fields?.phone}>
+            <Input id="a-phone" type="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: maskPhone(e.target.value) })} error={st.fields?.phone} />
+          </Field>
+          <button className="btn-primary" disabled={st.busy}>{st.busy ? "Salvando…" : "Salvar"}</button>
+        </form>
+
+        <form
+          className="card space-y-4 p-6 lg:self-start"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setPst({ busy: true });
+            try {
+              await api("/me/password", { method: "PUT", body: pw });
+              setPst({ ok: true });
+              setPw({ current: "", password: "" });
+            } catch (e: any) {
+              setPst({ err: e.message, fields: e.fields });
+            }
+          }}
+        >
+          <h2 className="text-lg font-bold">Trocar senha</h2>
+          {pst.err && <Alert>{pst.err}</Alert>}
+          {pst.ok && <Alert kind="success">Senha alterada.</Alert>}
+          <Field id="p-cur" label="Senha atual" error={pst.fields?.current}>
+            <Input id="p-cur" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} error={pst.fields?.current} />
+          </Field>
+          <Field id="p-new" label="Nova senha" hint="Mínimo de 8 caracteres." error={pst.fields?.password}>
+            <Input id="p-new" type="password" autoComplete="new-password" value={pw.password} onChange={(e) => setPw({ ...pw, password: e.target.value })} error={pst.fields?.password} />
+          </Field>
+          <button className="btn-ghost" disabled={pst.busy}>Alterar senha</button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -418,3 +559,4 @@ function PartnershipsTab({ me }: { me: Me }) {
     </ul>
   );
 }
+
