@@ -17,8 +17,10 @@ app.set("trust proxy", 1);
 
 const DATA_DIR = process.env.DATA_DIR || path.resolve("data");
 const AVATARS_DIR = path.join(DATA_DIR, "avatars");
+const PORTFOLIO_DIR = path.join(DATA_DIR, "portfolio");
 
 fs.mkdirSync(AVATARS_DIR, { recursive: true });
+fs.mkdirSync(PORTFOLIO_DIR, { recursive: true });
 
 app.use(
   helmet({
@@ -40,6 +42,17 @@ app.use(
 app.use(
   "/uploads/avatars",
   express.static(AVATARS_DIR, {
+    index: false,
+    dotfiles: "deny",
+    maxAge: "1y",
+    immutable: true,
+  })
+);
+
+// Disponibiliza as imagens do portfólio.
+app.use(
+  "/uploads/portfolio",
+  express.static(PORTFOLIO_DIR, {
     index: false,
     dotfiles: "deny",
     maxAge: "1y",
@@ -87,4 +100,3 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
     process.exit(0);
   });
 }
-
