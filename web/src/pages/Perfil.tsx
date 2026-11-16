@@ -85,25 +85,6 @@ export default function Perfil() {
           </section>
 
           <section className="card p-6 sm:p-8">
-            <h2 className="text-lg font-bold">Serviços</h2>
-            {p.services.length === 0 ? (
-              <p className="mt-2 text-sm text-ink-soft">O profissional ainda não detalhou os serviços.</p>
-            ) : (
-              <ul className="mt-4 divide-y divide-line">
-                {p.services.map((s) => (
-                  <li key={s.id} className="flex flex-col gap-1 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-                    <div>
-                      <p className="font-bold">{s.title}</p>
-                      {s.description && <p className="mt-0.5 text-sm text-ink-soft">{s.description}</p>}
-                    </div>
-                    {s.price && <span className="shrink-0 text-sm font-bold text-brand">{s.price}</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="card p-6 sm:p-8">
             <h2 className="text-lg font-bold">Portfólio</h2>
             <p className="mt-1 text-sm text-ink-soft">
               Conheça alguns trabalhos realizados por este profissional.
@@ -129,6 +110,25 @@ export default function Perfil() {
                   </div>
                 ))}
               </div>
+            )}
+          </section>
+
+          <section className="card p-6 sm:p-8">
+            <h2 className="text-lg font-bold">Serviços</h2>
+            {p.services.length === 0 ? (
+              <p className="mt-2 text-sm text-ink-soft">O profissional ainda não detalhou os serviços.</p>
+            ) : (
+              <ul className="mt-4 divide-y divide-line">
+                {p.services.map((s) => (
+                  <li key={s.id} className="flex flex-col gap-1 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+                    <div>
+                      <p className="font-bold">{s.title}</p>
+                      {s.description && <p className="mt-0.5 text-sm text-ink-soft">{s.description}</p>}
+                    </div>
+                    {s.price && <span className="shrink-0 text-sm font-bold text-brand">{s.price}</span>}
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
 
