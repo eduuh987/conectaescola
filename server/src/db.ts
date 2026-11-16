@@ -1,3 +1,4 @@
+
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
@@ -145,6 +146,9 @@ const migrations: string[] = [
   CREATE INDEX idx_profiles_category ON professional_profiles(category_id);
   CREATE INDEX idx_reviews_profile ON reviews(profile_id);
   `,
+  `
+  ALTER TABLE users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))");
@@ -222,3 +226,4 @@ export function tx<T>(fn: () => T): T {
     throw e;
   }
 }
+
