@@ -29,10 +29,18 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   return data as T;
 }
 
-// Envio de arquivos sem converter a imagem em texto.
-export async function apiUpload<T = any>(path: string, file: File): Promise<T> {
+// Envio de um ou vários arquivos sem converter as imagens em texto.
+// Por padrão, mantém o campo "avatar" usado pelas fotos de perfil.
+export async function apiUpload<T = any>(
+  path: string,
+  files: File | File[],
+  fieldName?: string
+): Promise<T> {
   const body = new FormData();
-  body.append("avatar", file);
+  const fileList = Array.isArray(files) ? files : [files];
+  const field = fieldName || (Array.isArray(files) ? "images" : "avatar");
+
+  fileList.forEach((file) => body.append(field, file));
 
   let res: Response;
 
@@ -202,3 +210,4 @@ export function usePageTitle(title: string) {
     document.title = title ? `${title} · Conecta Escola` : "Conecta Escola";
   }, [title]);
 }
+
