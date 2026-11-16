@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, BadgeCheck, Clock, FileText, Lock, MapPin, MessageCircle, Wallet } from "lucide-react";
@@ -9,7 +10,7 @@ type Profile = {
   id: number; slug: string; display_name: string; profession: string; bio: string; experience: string;
   city: string; neighborhood: string; service_area: string; contact_hours: string; price_range: string;
   category_name: string | null; category_slug: string | null; school_name: string | null;
-  rating: number | null; review_count: number;
+  rating: number | null; review_count: number; avatar_url?: string;
   services: { id: number; title: string; description: string; price: string }[];
   reviews: { id: number; rating: number; comment: string; created_at: string; author_name: string }[];
   is_owner: boolean; can_contact: boolean; whatsapp: string | null; has_whatsapp: boolean;
@@ -41,7 +42,17 @@ export default function Perfil() {
         <div className="space-y-6">
           <section className="card p-6 sm:p-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-brand-light font-display text-xl font-bold text-brand">{initials(p.display_name)}</span>
+              <span className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-brand-light font-display text-2xl font-bold text-brand sm:h-24 sm:w-24">
+                {p.avatar_url ? (
+                  <img
+                    src={p.avatar_url}
+                    alt={`Foto de ${p.display_name}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initials(p.display_name)
+                )}
+              </span>
               <div className="min-w-0 flex-1">
                 {p.category_name && (
                   <Link to={`/profissionais?categoria=${p.category_slug}`} className="eyebrow hover:underline">{p.category_name}</Link>
@@ -265,3 +276,4 @@ function ReviewModal({ open, onClose, slug, current, onSaved }: { open: boolean;
     </Modal>
   );
 }
+
