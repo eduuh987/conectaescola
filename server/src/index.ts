@@ -36,7 +36,7 @@ app.use(
   })
 );
 
-// Pasta pública exclusiva das fotos de perfil.
+// Disponibiliza somente as fotos de perfil.
 app.use(
   "/uploads/avatars",
   express.static(AVATARS_DIR, {
@@ -47,19 +47,15 @@ app.use(
   })
 );
 
-// Recebe imagens de até 5 MB.
-app.use("/api/me/avatar", express.raw({
-  type: "application/octet-stream",
-  limit: "5mb",
-}));
-
 app.use(express.json({ limit: "200kb" }));
 app.use(cookieParser());
 app.use(loadUser);
 
 app.use("/api/admin", admin);
 app.use("/api", api);
-app.use("/api", (_req, res) => res.status(404).json({ error: "Rota não encontrada." }));
+app.use("/api", (_req, res) =>
+  res.status(404).json({ error: "Rota não encontrada." })
+);
 app.use("/api", errorHandler);
 
 // Frontend compilado (SPA).
@@ -83,7 +79,7 @@ const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`[conecta-escola] no celular (mesmo Wi-Fi): http://IP-DO-NOTEBOOK:${HOST_PORT} (QR code em /qr)`);
 });
 
-// Desliga rápido e sem corromper o banco quando o Docker pede para parar.
+// Desliga sem corromper o banco quando o Docker pede para parar.
 for (const sig of ["SIGTERM", "SIGINT"] as const) {
   process.on(sig, () => {
     server.close();
@@ -91,3 +87,4 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
     process.exit(0);
   });
 }
+
