@@ -1,11 +1,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Camera, Clock, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { Camera, Clock, ExternalLink, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, apiUpload, formatDate, maskPhone, useApi, useAuth, usePageTitle, whatsappLink, type User } from "../lib";
 import { Alert, Empty, ErrorState, Field, Input, Modal, Spinner, StatusBadge, Textarea } from "../ui";
 
 type Service = { id: number; title: string; description: string; price: string };
+type PortfolioImage = { id: number; image_url: string; created_at: string };
+
 type Me = {
   user: User;
   school: { id: number; name: string } | null;
@@ -14,6 +16,7 @@ type Me = {
     neighborhood: string; service_area: string; whatsapp: string; contact_hours: string; price_range: string; published: number; hidden_by_admin: number;
   };
   services: Service[];
+  portfolio: PortfolioImage[];
   sentQuotes: { id: number; description: string; status: string; created_at: string; display_name: string; slug: string }[];
   receivedQuotes: { id: number; description: string; status: string; created_at: string; family_name: string; family_phone: string; family_email: string }[];
   partnerships: { id: number; title: string; status: string; created_at: string }[];
@@ -234,6 +237,158 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
   );
 }
 
+function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onChange: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const remaining = Math.max(0, 8 - images.length);
+
+  async function uploadPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    setError("");
+    setSuccess("");
+
+    const selected = Array.from(files);
+
+    if (selected.length > remaining) {
+      setError(`Você pode adicionar no máximo mais ${remaining} ${remaining === 1 ? "foto" : "fotos"}.`);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    for (const file of selected) {
+      if (!allowedTypes.includes(file.type)) {
+        setError(`O arquivo "${file.name}" não é JPG, PNG ou WebP.`);
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`O arquivo "${file.name}" ultrapassa o limite de 5 MB.`);
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
+    }
+
+    setBusy(true);
+
+    try {
+      await apiUpload<{ ok: boolean; images: PortfolioImage[] }>("/me/portfolio", selected, "images");
+      setSuccess(`${selected.length} ${selected.length === 1 ? "foto adicionada" : "fotos adicionadas"} ao portfólio!`);
+      onChange();
+    } catch (e: any) {
+      setError(e.message || "Não foi possível enviar as fotos.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function removePhoto(photo: PortfolioImage) {
+    if (!confirm("Deseja realmente remover esta foto do portfólio?")) return;
+
+    setBusy(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api(`/me/portfolio/${photo.id}`, { method: "DELETE" });
+      setSuccess("Foto removida do portfólio.");
+      onChange();
+    } catch (e: any) {
+      setError(e.message || "Não foi possível remover a foto.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold">Meu portfólio</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Mostre fotos dos seus trabalhos para que as famílias conheçam melhor seus serviços.
+          </p>
+        </div>
+        <span className="rounded-full bg-brand-light px-3 py-1 text-xs font-bold text-brand">
+          {images.length}/8 fotos
+        </span>
+      </div>
+
+      {images.length > 0 ? (
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {images.map((photo) => (
+            <div key={photo.id} className="group relative overflow-hidden rounded-xl border border-line bg-cream-2">
+              <img
+                src={photo.image_url}
+                alt="Foto de trabalho do portfólio"
+                loading="lazy"
+                className="aspect-square w-full object-cover"
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => removePhoto(photo)}
+                aria-label="Remover foto do portfólio"
+                className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-red-600 shadow transition hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-xl border border-dashed border-line bg-cream-2 px-4 py-8 text-center">
+          <ImagePlus className="mx-auto text-brand" size={32} />
+          <p className="mt-2 text-sm font-bold">Seu portfólio ainda está vazio</p>
+          <p className="mt-1 text-xs text-ink-soft">Adicione fotos dos seus trabalhos para montar sua galeria.</p>
+        </div>
+      )}
+
+      {remaining > 0 && (
+        <div className="mt-5">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={(e) => uploadPhotos(e.target.files)}
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+          >
+            <ImagePlus size={16} />
+            {busy ? "Enviando fotos..." : "Adicionar fotos"}
+          </button>
+        </div>
+      )}
+
+      {remaining === 0 && (
+        <p className="mt-4 text-xs font-medium text-ink-soft">
+          Você atingiu o limite de 8 fotos. Remova alguma imagem para adicionar outra.
+        </p>
+      )}
+
+      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
+      {success && <div className="mt-4"><Alert kind="success">{success}</Alert></div>}
+
+      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">
+        São permitidas até 8 imagens. Formatos aceitos: JPG, PNG e WebP. Cada imagem pode ter no máximo 5 MB. As fotos poderão ficar visíveis publicamente no seu perfil profissional.
+      </p>
+    </section>
+  );
+}
+
 function AccountTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
   const [f, setF] = useState({ name: me.user.name, phone: maskPhone(me.user.phone) });
   const [st, setSt] = useState<{ busy?: boolean; err?: string; ok?: string; fields?: Record<string, string> }>({});
@@ -405,12 +560,19 @@ function ProfileTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
         <button className="btn-primary" disabled={st.busy}>{st.busy ? "Salvando…" : p ? "Salvar alterações" : "Criar perfil"}</button>
       </form>
 
-      <div className="lg:self-start">{p ? <ServicesEditor services={me.services} onChange={onSaved} /> : (
-        <div className="card p-6 text-sm text-ink-soft">
-          <h2 className="text-lg font-bold text-ink">Serviços</h2>
-          <p className="mt-2">Depois de criar seu perfil, você poderá cadastrar cada serviço com descrição e preço.</p>
-        </div>
-      )}</div>
+      <div className="space-y-6 lg:self-start">
+        {p ? (
+          <>
+            <ServicesEditor services={me.services} onChange={onSaved} />
+            <PortfolioEditor images={me.portfolio || []} onChange={onSaved} />
+          </>
+        ) : (
+          <div className="card p-6 text-sm text-ink-soft">
+            <h2 className="text-lg font-bold text-ink">Serviços e portfólio</h2>
+            <p className="mt-2">Depois de criar seu perfil profissional, você poderá cadastrar seus serviços e adicionar fotos dos seus trabalhos ao portfólio.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -559,4 +721,3 @@ function PartnershipsTab({ me }: { me: Me }) {
     </ul>
   );
 }
-
