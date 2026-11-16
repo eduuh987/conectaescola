@@ -1,3 +1,4 @@
+
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 // ───────── Cliente HTTP ─────────
@@ -28,26 +29,56 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   return data as T;
 }
 
+// Envio de arquivos sem converter a imagem em texto.
+export async function apiUpload<T = any>(path: string, file: File): Promise<T> {
+  const body = new FormData();
+  body.append("avatar", file);
+
+  let res: Response;
+
+  try {
+    res = await fetch(`/api${path}`, {
+      method: "POST",
+      body,
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ApiError(0, "Sem conexão com o servidor. Verifique a rede e tente novamente.");
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new ApiError(res.status, data.error || "Não foi possível enviar a imagem.", data.fields || {});
+  }
+
+  return data as T;
+}
+
 // Hook simples de carregamento de dados.
 export function useApi<T>(path: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(!!path);
   const [tick, setTick] = useState(0);
+
   useEffect(() => {
     if (!path) return;
     let alive = true;
     setLoading(true);
     setError(null);
+
     api<T>(path)
       .then((d) => alive && setData(d))
       .catch((e) => alive && setError(e))
       .finally(() => alive && setLoading(false));
+
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, tick, ...deps]);
+
   const reload = useCallback(() => setTick((t) => t + 1), []);
   return { data, error, loading, reload, setData };
 }
@@ -64,14 +95,23 @@ export type User = {
   is_admin: boolean;
   status: "pending" | "approved" | "rejected" | "suspended";
   status_reason: string;
+  avatar_url: string;
 };
 
-type AuthCtx = { user: User | null; ready: boolean; refresh: () => Promise<void>; setUser: (u: User | null) => void; logout: () => Promise<void> };
+type AuthCtx = {
+  user: User | null;
+  ready: boolean;
+  refresh: () => Promise<void>;
+  setUser: (u: User | null) => void;
+  logout: () => Promise<void>;
+};
+
 const Ctx = createContext<AuthCtx>(null as any);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+
   const refresh = useCallback(async () => {
     try {
       const r = await api<{ user: User | null }>("/auth/me");
@@ -82,27 +122,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
     }
   }, []);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
+
   const logout = useCallback(async () => {
     await api("/auth/logout", { method: "POST" }).catch(() => {});
     setUser(null);
   }, []);
+
   return <Ctx.Provider value={{ user, ready, refresh, setUser, logout }}>{children}</Ctx.Provider>;
 }
+
 export const useAuth = () => useContext(Ctx);
 
 // ───────── Dados do site (escola) ─────────
-type Site = { school: { id: number; name: string; city: string } | null; publicUrl: string };
+type Site = {
+  school: { id: number; name: string; city: string } | null;
+  publicUrl: string;
+};
+
 const SiteCtx = createContext<Site>({ school: null, publicUrl: "" });
+
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [site, setSite] = useState<Site>({ school: null, publicUrl: "" });
+
   useEffect(() => {
     api<Site>("/site").then(setSite).catch(() => {});
   }, []);
+
   return <SiteCtx.Provider value={site}>{children}</SiteCtx.Provider>;
 }
+
 export const useSite = () => useContext(SiteCtx);
 
 // ───────── Utilidades ─────────
@@ -127,6 +179,7 @@ export function formatDate(s: string) {
   const d = new Date(s.replace(" ", "T") + "Z");
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
+
 export function formatDateTime(s: string) {
   const d = new Date(s.replace(" ", "T") + "Z");
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
