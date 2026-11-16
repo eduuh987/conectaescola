@@ -149,13 +149,27 @@ const migrations: string[] = [
   `
   ALTER TABLE users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT '';
   `,
+  `
+  INSERT OR IGNORE INTO categories (name, slug, description, icon) VALUES
+    ('Costura e ajustes', 'costura-e-ajustes', 'Reformas de roupas, consertos e ajustes', 'paintbrush'),
+    ('Serviços domésticos', 'servicos-domesticos', 'Serviços gerais e apoio residencial', 'tag'),
+    ('Cuidados com pets', 'cuidados-com-pets', 'Banho, cuidados e passeios de animais', 'flower'),
+    ('Artesanato', 'artesanato', 'Peças artesanais e trabalhos manuais', 'sparkles'),
+    ('Fotografia e vídeo', 'fotografia-e-video', 'Ensaios, eventos e produção audiovisual', 'laptop'),
+    ('Manutenção de eletrodomésticos', 'manutencao-de-eletrodomesticos', 'Conserto de geladeiras, máquinas de lavar e outros aparelhos', 'zap'),
+    ('Organização e limpeza', 'organizacao-e-limpeza', 'Faxina e organização de ambientes', 'tag'),
+    ('Marcenaria', 'marcenaria', 'Móveis, montagem e reparos em madeira', 'paintbrush'),
+    ('Outros serviços', 'outros-servicos', 'Atividades profissionais que não se encaixam nas demais categorias', 'tag');
+  `,
 ];
 
 db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))");
 const current = (db.prepare("SELECT COALESCE(MAX(version),0) AS v FROM schema_migrations").get() as { v: number }).v;
+
 migrations.forEach((sql, i) => {
   const version = i + 1;
   if (version <= current) return;
+
   db.exec("BEGIN");
   try {
     db.exec(sql);
@@ -180,10 +194,20 @@ const DEFAULT_CATEGORIES: [string, string, string, string][] = [
   ["Alimentação", "alimentacao", "Bolos, doces, marmitas e buffet", "cake"],
   ["Festas e Eventos", "festas-e-eventos", "Decoração, recreação e animação", "party"],
   ["Transporte", "transporte", "Transporte escolar, fretes e mudanças", "bus"],
+  ["Costura e ajustes", "costura-e-ajustes", "Reformas de roupas, consertos e ajustes", "paintbrush"],
+  ["Serviços domésticos", "servicos-domesticos", "Serviços gerais e apoio residencial", "tag"],
+  ["Cuidados com pets", "cuidados-com-pets", "Banho, cuidados e passeios de animais", "flower"],
+  ["Artesanato", "artesanato", "Peças artesanais e trabalhos manuais", "sparkles"],
+  ["Fotografia e vídeo", "fotografia-e-video", "Ensaios, eventos e produção audiovisual", "laptop"],
+  ["Manutenção de eletrodomésticos", "manutencao-de-eletrodomesticos", "Conserto de geladeiras, máquinas de lavar e outros aparelhos", "zap"],
+  ["Organização e limpeza", "organizacao-e-limpeza", "Faxina e organização de ambientes", "tag"],
+  ["Marcenaria", "marcenaria", "Móveis, montagem e reparos em madeira", "paintbrush"],
+  ["Outros serviços", "outros-servicos", "Atividades profissionais que não se encaixam nas demais categorias", "tag"],
 ];
 
 export function seed() {
   const schoolCount = (db.prepare("SELECT COUNT(*) AS c FROM schools").get() as { c: number }).c;
+
   if (schoolCount === 0) {
     const names = (process.env.SCHOOLS || "E.E VILA SÃO JOAQUIM II").split(";").map((s) => s.trim()).filter(Boolean);
     const city = process.env.SCHOOL_CITY || "Cotia";
@@ -191,21 +215,22 @@ export function seed() {
     names.forEach((n) => ins.run(n, city));
     console.log(`[seed] escolas: ${names.join(", ")}`);
   }
-  const catCount = (db.prepare("SELECT COUNT(*) AS c FROM categories").get() as { c: number }).c;
-  if (catCount === 0) {
-    const ins = db.prepare("INSERT INTO categories (name, slug, description, icon) VALUES (?, ?, ?, ?)");
-    DEFAULT_CATEGORIES.forEach((c) => ins.run(...c));
-    console.log(`[seed] ${DEFAULT_CATEGORIES.length} categorias criadas`);
-  }
+
+  const insCategory = db.prepare("INSERT OR IGNORE INTO categories (name, slug, description, icon) VALUES (?, ?, ?, ?)");
+  DEFAULT_CATEGORIES.forEach((c) => insCategory.run(...c));
+
   const adminCount = (db.prepare("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").get() as { c: number }).c;
+
   if (adminCount === 0) {
     const email = process.env.ADMIN_EMAIL || "admin@conectaescola.local";
     const password = process.env.ADMIN_PASSWORD || "conecta123";
     const school = db.prepare("SELECT id FROM schools ORDER BY id LIMIT 1").get() as { id: number };
+
     db.prepare(
       `INSERT INTO users (name, email, password_hash, school_id, is_admin, status, consent_at)
        VALUES ('Administrador', ?, ?, ?, 1, 'approved', datetime('now'))`
-    ).run(email, bcrypt.hashSync(password, 10), school.id);
+    ).run(email, bcrypt.hashSync(password, 10));
+
     console.log(`[seed] administrador criado: ${email} (troque a senha em Minha conta)`);
   }
 }
