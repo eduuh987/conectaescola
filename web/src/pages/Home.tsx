@@ -134,17 +134,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="absolute -left-4 top-1/3 hidden rounded-2xl border border-line bg-white p-3 shadow-card sm:block">
-              <div className="flex items-center gap-2">
-                <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-brand">
-                  <BriefcaseBusiness size={17} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-ink">Novas oportunidades</p>
-                  <p className="text-[10px] text-ink-soft">Dentro da comunidade</p>
-                </div>
-              </div>
-            </div>
+           
           </div>
         </div>
       </section>
