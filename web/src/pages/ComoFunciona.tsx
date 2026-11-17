@@ -34,7 +34,7 @@ export default function ComoFunciona() {
           ))}
 
           <div className="card border-sky-200 bg-sky-50/60 p-6">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-sky-400 text-white">
+            <span className="grid h-10 w-10 place-items-center rounded-full text-white" style={{ backgroundColor: "#D13232" }}>
               <ShieldAlert size={18} />
             </span>
             <h2 className="mt-4 text-lg font-bold">Limites da plataforma</h2>
@@ -52,4 +52,3 @@ export default function ComoFunciona() {
     </>
   );
 }
-
