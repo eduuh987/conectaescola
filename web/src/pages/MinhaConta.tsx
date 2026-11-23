@@ -1,7 +1,6 @@
-
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Camera, Clock, ExternalLink, ImagePlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Briefcase, Camera, CheckCircle2, Clock, ExternalLink, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, apiUpload, formatDate, maskPhone, useApi, useAuth, usePageTitle, whatsappLink, type User } from "../lib";
 import { Alert, Empty, ErrorState, Field, Input, Modal, Spinner, StatusBadge, Textarea } from "../ui";
 
@@ -38,7 +37,7 @@ export default function MinhaConta() {
 
   const tabs = [
     { id: "conta", label: "Minha conta" },
-    { id: "perfil", label: d.profile ? "Perfil profissional" : "Sou profissional" },
+    { id: "perfil", label: d.profile ? "Meu perfil profissional" : "Oferecer serviços" },
     { id: "orcamentos", label: "Orçamentos" },
     ...(d.profile ? [{ id: "parcerias", label: "Minhas parcerias" }] : []),
   ];
@@ -47,6 +46,94 @@ export default function MinhaConta() {
     <div className="container-x py-8 sm:py-12">
       <h1 className="text-3xl font-extrabold">Olá, {d.user.name.split(" ")[0]}!</h1>
       <StatusCard me={d} onChange={reload} isNew={params.get("novo") === "1"} />
+
+      {!d.user.is_admin && (
+        <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white shadow-sm">
+          {d.profile ? (
+            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                  <CheckCircle2 size={25} />
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-sky-700">Perfil profissional criado</p>
+                  <h2 className="mt-1 text-lg font-extrabold text-ink">Seu espaço profissional está aqui!</h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-soft">
+                    Atualize suas informações, cadastre serviços e adicione fotos dos seus trabalhos para apresentar melhor o que você faz.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setParams({ aba: "perfil" })}
+                className="btn-primary shrink-0"
+              >
+                Gerenciar meu perfil <ArrowRight size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="p-5 sm:p-6">
+              <div className="mx-auto max-w-3xl text-center">
+                <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-extrabold text-sky-800">
+                  <Briefcase size={14} /> Uma escolha importante
+                </span>
+                <h2 className="mt-3 text-xl font-extrabold text-ink sm:text-2xl">
+                  Como você quer usar o Conecta Escola?
+                </h2>
+                <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
+                  Você já criou sua conta! Agora escolha como deseja participar da comunidade. Essa escolha não é definitiva: você pode criar seu perfil profissional depois, se quiser.
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                      <Search size={22} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-ink">Quero procurar profissionais</h3>
+                      <p className="text-xs font-medium text-sky-700">Para famílias e responsáveis</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 flex-1 text-sm leading-relaxed text-ink-soft">
+                    Encontre pessoas da comunidade que oferecem serviços, conheça seus trabalhos e entre em contato. Você não precisa criar um perfil profissional para pesquisar.
+                  </p>
+                  <Link to="/profissionais" className="btn-ghost mt-5 w-full justify-center border border-line">
+                    Encontrar profissionais <ArrowRight size={16} />
+                  </Link>
+                </div>
+
+                <div className="flex flex-col rounded-xl border-2 border-sky-300 bg-sky-50/70 p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-700 text-white">
+                      <Briefcase size={22} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-ink">Quero oferecer meus serviços</h3>
+                      <p className="text-xs font-medium text-sky-700">Para profissionais autônomos</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 flex-1 text-sm leading-relaxed text-ink-soft">
+                    Crie seu espaço profissional, conte o que você faz, informe como atende, divulgue seus serviços e adicione fotos dos seus trabalhos.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setParams({ aba: "perfil" })}
+                    className="btn-primary mt-5 w-full justify-center"
+                  >
+                    Criar meu perfil profissional <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <p className="mt-4 text-center text-xs leading-relaxed text-ink-mute">
+                Não trabalha como profissional autônomo? Sem problema! Você pode usar sua conta normalmente para conhecer os profissionais e os serviços disponíveis.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="mt-8 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
         {tabs.map((t) => (
