@@ -9,9 +9,12 @@ import { api, ApiError, initials, STATUS_LABEL, useAuth, type User } from "./lib
 
 export function Logo({ light = false }: { light?: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-2.5" aria-label="Conecta Escola, página inicial">
-      <span className="grid h-8 w-8 place-items-center rounded-full bg-brand font-display text-sm font-bold text-white">C</span>
-      <span className={`font-display text-[15px] font-bold ${light ? "text-white" : "text-ink"}`}>Conecta Escola</span>
+    <Link to="/" className="flex items-center" aria-label="Conecta Escola, página inicial">
+      <img
+        src="/logo-conecta-escola.png"
+        alt="Conecta Escola"
+        className={`h-12 w-12 shrink-0 rounded-full object-contain ${light ? "ring-1 ring-white/20" : ""}`}
+      />
     </Link>
   );
 }
@@ -297,3 +300,4 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; tit
     </section>
   );
 }
+
