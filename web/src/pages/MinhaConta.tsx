@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Briefcase, Camera, CheckCircle2, Clock, ExternalLink, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
@@ -23,115 +24,86 @@ type Me = {
 
 const QUOTE_STATUS: Record<string, string> = { new: "Nova", answered: "Respondida", closed: "Encerrada" };
 
+type OnboardingStep = "avatar" | "profile" | "portfolio" | "complete" | null;
+
 export default function MinhaConta() {
   usePageTitle("Minha conta");
   const { refresh } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = params.get("aba") || "conta";
   const me = useApi<Me>("/me");
+  const [wizardStep, setWizardStep] = useState<OnboardingStep>(null);
+  const flowRef = useRef<HTMLDivElement>(null);
   const reload = () => { me.reload(); refresh(); };
+
+  useEffect(() => {
+    if (wizardStep) {
+      window.setTimeout(() => flowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+  }, [wizardStep]);
 
   if (me.loading && !me.data) return <Spinner />;
   if (me.error || !me.data) return <div className="container-x"><ErrorState error={me.error!} onRetry={me.reload} /></div>;
   const d = me.data;
+  const isProfessional = !!d.user.is_professional || !!d.profile;
+  const isNew = params.get("novo") === "1";
+  const startProfessionalFlow = () => {
+    setParams({ aba: "perfil" });
+    setWizardStep("avatar");
+  };
+  const finishProfessionalFlow = () => {
+    reload();
+    setWizardStep("complete");
+  };
 
   const tabs = [
     { id: "conta", label: "Minha conta" },
-    { id: "perfil", label: d.profile ? "Meu perfil profissional" : "Oferecer serviços" },
-    { id: "orcamentos", label: "Orçamentos" },
-    ...(d.profile ? [{ id: "parcerias", label: "Minhas parcerias" }] : []),
+    { id: "perfil", label: isProfessional ? "Meu perfil profissional" : "Meu perfil" },
+    ...(isProfessional ? [
+      { id: "orcamentos", label: "Orçamentos" },
+      { id: "parcerias", label: "Minhas parcerias" },
+    ] : []),
   ];
 
   return (
     <div className="container-x py-8 sm:py-12">
       <h1 className="text-3xl font-extrabold">Olá, {d.user.name.split(" ")[0]}!</h1>
-      <StatusCard me={d} onChange={reload} isNew={params.get("novo") === "1"} />
+      <StatusCard me={d} onChange={reload} isNew={isNew} />
 
-      {!d.user.is_admin && (
-        <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white shadow-sm">
-          {d.profile ? (
-            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                  <CheckCircle2 size={25} />
-                </div>
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wide text-sky-700">Perfil profissional criado</p>
-                  <h2 className="mt-1 text-lg font-extrabold text-ink">Seu espaço profissional está aqui!</h2>
-                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-soft">
-                    Atualize suas informações, cadastre serviços e adicione fotos dos seus trabalhos para apresentar melhor o que você faz.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setParams({ aba: "perfil" })}
-                className="btn-primary shrink-0"
-              >
-                Gerenciar meu perfil <ArrowRight size={16} />
-              </button>
+      {isNew && !isProfessional && !d.user.is_admin && (
+        <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-sm sm:p-6">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-extrabold text-sky-800">
+              <Briefcase size={14} /> Bem-vindo ao Conecta Escola
+            </span>
+            <h2 className="mt-3 text-xl font-extrabold text-ink sm:text-2xl">Como você quer participar?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">Você pode procurar serviços normalmente ou criar um perfil para oferecer seus próprios serviços. Essa escolha pode ser alterada depois.</p>
+          </div>
+          <div className="mx-auto mt-5 grid max-w-3xl gap-3 sm:grid-cols-2">
+            <Link to="/profissionais" className="flex flex-col rounded-xl border border-sky-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md">
+              <span className="flex items-center gap-2 font-extrabold text-ink"><Search size={19} className="text-sky-700" /> Quero procurar profissionais</span>
+              <span className="mt-2 flex-1 text-sm leading-relaxed text-ink-soft">Encontre serviços oferecidos pela comunidade. Você não precisa criar um perfil profissional.</span>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-brand">Encontrar profissionais <ArrowRight size={15} /></span>
+            </Link>
+            <button type="button" onClick={startProfessionalFlow} className="flex flex-col rounded-xl border-2 border-sky-300 bg-sky-50/70 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md">
+              <span className="flex items-center gap-2 font-extrabold text-ink"><Briefcase size={19} className="text-sky-700" /> Quero oferecer meus serviços</span>
+              <span className="mt-2 flex-1 text-sm leading-relaxed text-ink-soft">Monte seu perfil profissional, apresente seu trabalho e conecte-se com famílias da comunidade.</span>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-brand">Começar cadastro <ArrowRight size={15} /></span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {isProfessional && !d.user.is_admin && !wizardStep && (
+        <section className="mt-6 flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={23} />
+            <div>
+              <p className="font-extrabold text-ink">Seu perfil profissional está ativo na sua conta</p>
+              <p className="mt-1 text-sm text-ink-soft">Gerencie seus dados, serviços, pedidos de orçamento e oportunidades de parceria.</p>
             </div>
-          ) : (
-            <div className="p-5 sm:p-6">
-              <div className="mx-auto max-w-3xl text-center">
-                <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-extrabold text-sky-800">
-                  <Briefcase size={14} /> Uma escolha importante
-                </span>
-                <h2 className="mt-3 text-xl font-extrabold text-ink sm:text-2xl">
-                  Como você quer usar o Conecta Escola?
-                </h2>
-                <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-                  Você já criou sua conta! Agora escolha como deseja participar da comunidade. Essa escolha não é definitiva: você pode criar seu perfil profissional depois, se quiser.
-                </p>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="flex flex-col rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                      <Search size={22} />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-ink">Quero procurar profissionais</h3>
-                      <p className="text-xs font-medium text-sky-700">Para famílias e responsáveis</p>
-                    </div>
-                  </div>
-                  <p className="mt-3 flex-1 text-sm leading-relaxed text-ink-soft">
-                    Encontre pessoas da comunidade que oferecem serviços, conheça seus trabalhos e entre em contato. Você não precisa criar um perfil profissional para pesquisar.
-                  </p>
-                  <Link to="/profissionais" className="btn-ghost mt-5 w-full justify-center border border-line">
-                    Encontrar profissionais <ArrowRight size={16} />
-                  </Link>
-                </div>
-
-                <div className="flex flex-col rounded-xl border-2 border-sky-300 bg-sky-50/70 p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-700 text-white">
-                      <Briefcase size={22} />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-ink">Quero oferecer meus serviços</h3>
-                      <p className="text-xs font-medium text-sky-700">Para profissionais autônomos</p>
-                    </div>
-                  </div>
-                  <p className="mt-3 flex-1 text-sm leading-relaxed text-ink-soft">
-                    Crie seu espaço profissional, conte o que você faz, informe como atende, divulgue seus serviços e adicione fotos dos seus trabalhos.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setParams({ aba: "perfil" })}
-                    className="btn-primary mt-5 w-full justify-center"
-                  >
-                    Criar meu perfil profissional <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <p className="mt-4 text-center text-xs leading-relaxed text-ink-mute">
-                Não trabalha como profissional autônomo? Sem problema! Você pode usar sua conta normalmente para conhecer os profissionais e os serviços disponíveis.
-              </p>
-            </div>
-          )}
+          </div>
+          <button type="button" onClick={() => { setParams({ aba: "perfil" }); setWizardStep(null); }} className="btn-primary shrink-0">Gerenciar perfil <ArrowRight size={16} /></button>
         </section>
       )}
 
@@ -141,7 +113,7 @@ export default function MinhaConta() {
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
-            onClick={() => setParams({ aba: t.id })}
+            onClick={() => { setWizardStep(null); setParams({ aba: t.id }); }}
             className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab === t.id ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"}`}
           >
             {t.label}
@@ -149,11 +121,90 @@ export default function MinhaConta() {
         ))}
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 scroll-mt-24" ref={flowRef}>
         {tab === "conta" && <AccountTab me={d} onSaved={reload} />}
-        {tab === "perfil" && <ProfileTab me={d} onSaved={reload} />}
-        {tab === "orcamentos" && <QuotesTab me={d} onChange={me.reload} />}
-        {tab === "parcerias" && <PartnershipsTab me={d} />}
+        {tab === "perfil" && (
+          <>
+            {wizardStep === "avatar" && (
+              <section className="mx-auto max-w-3xl space-y-5">
+                <WizardProgress step={1} />
+                <div>
+                  <h2 className="text-2xl font-extrabold">Vamos preparar seu perfil!</h2>
+                  <p className="mt-2 text-sm text-ink-soft">Primeiro, escolha uma foto para sua conta. Ela ajuda as pessoas a reconhecerem seu perfil, mas é opcional.</p>
+                </div>
+                <AvatarEditor user={d.user} onSaved={reload} />
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                  <button type="button" className="btn-ghost" onClick={() => setWizardStep("profile")}>Agora não</button>
+                  <button type="button" className="btn-primary" onClick={() => setWizardStep("profile")}>Continuar <ArrowRight size={16} /></button>
+                </div>
+              </section>
+            )}
+            {wizardStep === "profile" && (
+              <section className="space-y-5">
+                <WizardProgress step={2} />
+                <div>
+                  <h2 className="text-2xl font-extrabold">Conte um pouco sobre seu trabalho</h2>
+                  <p className="mt-2 text-sm text-ink-soft">Essas informações ajudam as famílias a conhecerem seus serviços e saberem como entrar em contato.</p>
+                </div>
+                <ProfileTab me={d} onSaved={reload} isWizard onNext={() => setWizardStep("portfolio")} />
+              </section>
+            )}
+            {wizardStep === "portfolio" && (
+              <section className="mx-auto max-w-4xl space-y-5">
+                <WizardProgress step={3} />
+                <div>
+                  <h2 className="text-2xl font-extrabold">Mostre um pouco do seu trabalho</h2>
+                  <p className="mt-2 text-sm text-ink-soft">Adicione fotos ao seu portfólio para apresentar exemplos do que você faz. Você pode pular esta etapa e incluir imagens depois.</p>
+                </div>
+                <PortfolioEditor images={d.portfolio || []} onChange={reload} />
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                  <button type="button" className="btn-ghost" onClick={finishProfessionalFlow}>Adicionar depois</button>
+                  <button type="button" className="btn-primary" onClick={finishProfessionalFlow}>Concluir cadastro <CheckCircle2 size={16} /></button>
+                </div>
+              </section>
+            )}
+            {wizardStep === "complete" && (
+              <section className="mx-auto max-w-3xl rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white px-6 py-10 text-center shadow-sm sm:px-10">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 size={36} /></div>
+                <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">Cadastro concluído</p>
+                <h2 className="mt-2 text-2xl font-extrabold text-ink sm:text-3xl">Parabéns! Seu perfil profissional foi criado.</h2>
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">Agora você pode completar seus serviços, acompanhar pedidos de orçamento e conhecer oportunidades de parceria. {d.user.status !== "approved" ? "Seu perfil será exibido no diretório depois da aprovação da equipe da escola." : "Seu perfil já pode ser gerenciado pela sua conta."}</p>
+                <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                  <Link to="/" className="btn-ghost justify-center border border-line">Página inicial</Link>
+                  <button type="button" className="btn-primary justify-center" onClick={() => { setWizardStep(null); reload(); setParams({ aba: "perfil" }); }}>Meu perfil</button>
+                  <Link to="/parcerias" className="btn-ghost justify-center border border-line">Procurar parcerias</Link>
+                </div>
+              </section>
+            )}
+            {!wizardStep && isProfessional && <ProfileTab me={d} onSaved={reload} />}
+            {!wizardStep && !isProfessional && (
+              <section className="mx-auto max-w-3xl rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-6 shadow-sm sm:p-8">
+                <div className="flex items-start gap-4">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sky-100 text-sky-700"><Briefcase size={24} /></div>
+                  <div>
+                    <h2 className="text-xl font-extrabold">Seu perfil no Conecta Escola</h2>
+                    <p className="mt-2 text-sm leading-relaxed text-ink-soft">No momento, sua conta está configurada para procurar profissionais e serviços. Se você também deseja divulgar seu trabalho, pode criar um perfil profissional quando quiser.</p>
+                    <button type="button" className="btn-primary mt-5" onClick={startProfessionalFlow}>Quero me tornar profissional <ArrowRight size={16} /></button>
+                  </div>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+        {tab === "orcamentos" && isProfessional && <QuotesTab me={d} onChange={me.reload} />}
+        {tab === "parcerias" && isProfessional && <PartnershipsTab me={d} />}
+      </div>
+    </div>
+  );
+}
+
+function WizardProgress({ step }: { step: 1 | 2 | 3 }) {
+  const labels = ["Foto de perfil", "Dados profissionais", "Portfólio"];
+  return (
+    <div className="rounded-xl border border-line bg-white p-4">
+      <div className="mb-3 flex items-center justify-between gap-2 text-xs font-bold text-ink-soft"><span>Etapa {step} de 3</span><span>{labels[step - 1]}</span></div>
+      <div className="grid grid-cols-3 gap-2">
+        {labels.map((label, index) => <div key={label} className={`h-2 rounded-full ${index < step ? "bg-brand" : "bg-cream-2"}`} />)}
       </div>
     </div>
   );
@@ -548,7 +599,7 @@ function AccountTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
 
 type Cat = { id: number; name: string };
 
-function ProfileTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
+function ProfileTab({ me, onSaved, isWizard = false, onNext }: { me: Me; onSaved: () => void; isWizard?: boolean; onNext?: () => void }) {
   const cats = useApi<Cat[]>("/categories");
   const p = me.profile;
   const [f, setF] = useState({
@@ -570,7 +621,7 @@ function ProfileTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
   const fe = st.fields || {};
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+    <div className={isWizard ? "max-w-4xl" : "grid gap-6 lg:grid-cols-[1.4fr_1fr]"}>
       <form
         className="card space-y-4 p-6"
         onSubmit={async (e) => {
@@ -580,6 +631,7 @@ function ProfileTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
             await api("/me/profile", { method: "PUT", body: f });
             setSt({ ok: true });
             onSaved();
+            if (isWizard) onNext?.();
           } catch (e: any) {
             setSt({ err: e.message, fields: e.fields });
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -647,19 +699,21 @@ function ProfileTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
         <button className="btn-primary" disabled={st.busy}>{st.busy ? "Salvando…" : p ? "Salvar alterações" : "Criar perfil"}</button>
       </form>
 
-      <div className="space-y-6 lg:self-start">
-        {p ? (
-          <>
-            <ServicesEditor services={me.services} onChange={onSaved} />
-            <PortfolioEditor images={me.portfolio || []} onChange={onSaved} />
-          </>
-        ) : (
-          <div className="card p-6 text-sm text-ink-soft">
-            <h2 className="text-lg font-bold text-ink">Serviços e portfólio</h2>
-            <p className="mt-2">Depois de criar seu perfil profissional, você poderá cadastrar seus serviços e adicionar fotos dos seus trabalhos ao portfólio.</p>
-          </div>
-        )}
-      </div>
+      {!isWizard && (
+        <div className="space-y-6 lg:self-start">
+          {p ? (
+            <>
+              <ServicesEditor services={me.services} onChange={onSaved} />
+              <PortfolioEditor images={me.portfolio || []} onChange={onSaved} />
+            </>
+          ) : (
+            <div className="card p-6 text-sm text-ink-soft">
+              <h2 className="text-lg font-bold text-ink">Serviços e portfólio</h2>
+              <p className="mt-2">Depois de criar seu perfil profissional, você poderá cadastrar seus serviços e adicionar fotos dos seus trabalhos ao portfólio.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
