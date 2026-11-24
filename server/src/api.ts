@@ -841,19 +841,41 @@ api.post("/partnerships", requireApproved, formLimiter, h((req, res) => {
   res.status(201).json({ id: Number(r.lastInsertRowid) });
 }));
 
+// Editar uma publicação: somente o profissional aprovado que a criou.
 api.put("/partnerships/:id", requireApproved, h((req, res) => {
+  if (!requireApprovedPro(req.user!)) {
+    return res.status(403).json({ error: "Apenas profissionais aprovados podem editar publicações." });
+  }
+
   const b = zPartnership.parse(req.body);
   const r = run(
     "UPDATE partnership_posts SET title = ?, description = ?, categories = ?, region = ?, deadline = ? WHERE id = ? AND author_id = ? AND status = 'active'",
     b.title, b.description, b.categories, b.region, b.deadline, int(req.params.id), req.user!.id
   );
-  if (!r.changes) return res.status(404).json({ error: "Publicação não encontrada." });
+
+  if (!r.changes) {
+    return res.status(404).json({ error: "Publicação não encontrada." });
+  }
+
   res.json({ ok: true });
 }));
 
-api.post("/partnerships/:id/close", requireAuth, h((req, res) => {
-  const r = run("UPDATE partnership_posts SET status = 'closed' WHERE id = ? AND author_id = ? AND status = 'active'", int(req.params.id), req.user!.id);
-  if (!r.changes) return res.status(404).json({ error: "Publicação não encontrada." });
+// Encerrar uma publicação: somente o profissional aprovado que a criou.
+api.post("/partnerships/:id/close", requireApproved, h((req, res) => {
+  if (!requireApprovedPro(req.user!)) {
+    return res.status(403).json({ error: "Apenas profissionais aprovados podem encerrar publicações." });
+  }
+
+  const r = run(
+    "UPDATE partnership_posts SET status = 'closed' WHERE id = ? AND author_id = ? AND status = 'active'",
+    int(req.params.id),
+    req.user!.id
+  );
+
+  if (!r.changes) {
+    return res.status(404).json({ error: "Publicação não encontrada." });
+  }
+
   res.json({ ok: true });
 }));
 
