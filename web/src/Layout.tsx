@@ -67,14 +67,16 @@ function Header() {
                 <div
                   id="parcerias-tooltip"
                   role="tooltip"
-                  className="pointer-events-none invisible absolute left-1/2 top-full z-50 mt-3 w-72 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-white p-4 text-left opacity-0 shadow-xl transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                  className="invisible pointer-events-none absolute left-1/2 top-full z-50 w-72 -translate-x-1/2 translate-y-1 pt-3 text-left opacity-0 transition-all duration-200 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100"
                 >
-                  <p className="text-xs font-bold text-ink">
-                    Como funcionam as parcerias?
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-                    {PARTNERSHIPS_DESCRIPTION}
-                  </p>
+                  <div className="rounded-xl border border-line bg-white p-4 shadow-xl">
+                    <p className="text-xs font-bold text-ink">
+                      Como funcionam as parcerias?
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+                      {PARTNERSHIPS_DESCRIPTION}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
