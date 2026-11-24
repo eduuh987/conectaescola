@@ -253,11 +253,11 @@ export function seed() {
     const school = db.prepare("SELECT id FROM schools ORDER BY id LIMIT 1").get() as { id: number };
 
     db.prepare(
-      \`INSERT INTO users (name, email, password_hash, school_id, is_admin, status, consent_at)
-       VALUES ('Administrador', ?, ?, ?, 1, 'approved', datetime('now'))\`
+      `INSERT INTO users (name, email, password_hash, school_id, is_admin, status, consent_at)
+       VALUES ('Administrador', ?, ?, ?, 1, 'approved', datetime('now'))`
     ).run(email, bcrypt.hashSync(password, 10));
 
-    console.log(\`[seed] administrador criado: \${email} (troque a senha em Minha conta)\`);
+    console.log(`[seed] administrador criado: ${email} (troque a senha em Minha conta)`);
   }
 }
 
