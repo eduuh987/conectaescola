@@ -13,6 +13,9 @@ const NAV = [
   { to: "/contato", label: "Contato" },
 ];
 
+const PARTNERSHIPS_DESCRIPTION =
+  "Na área de Parcerias, profissionais podem divulgar projetos, encontrar pessoas interessadas em colaborar e formar novas parcerias.";
+
 function Header() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -36,39 +39,81 @@ function Header() {
   };
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `text-[13px] font-medium transition hover:text-brand ${isActive ? "text-brand" : "text-ink-soft"}`;
+    `text-[13px] font-medium transition hover:text-brand ${
+      isActive ? "text-brand" : "text-ink-soft"
+    }`;
 
   return (
-    <header className={`sticky top-0 z-40 bg-cream/95 backdrop-blur transition-shadow ${scrolled ? "shadow-[0_1px_0_#E7E2D8]" : ""}`}>
+    <header
+      className={`sticky top-0 z-40 bg-cream/95 backdrop-blur transition-shadow ${
+        scrolled ? "shadow-[0_1px_0_#E7E2D8]" : ""
+      }`}
+    >
       <div className="container-x flex h-[60px] items-center justify-between gap-4">
         <Logo />
 
         <nav className="hidden items-center gap-6 lg:flex" aria-label="Principal">
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} className={linkCls}>
-              {n.label}
-            </NavLink>
-          ))}
+          {NAV.map((n) =>
+            n.to === "/parcerias" ? (
+              <div key={n.to} className="group relative">
+                <NavLink
+                  to={n.to}
+                  className={linkCls}
+                  aria-describedby="parcerias-tooltip"
+                >
+                  {n.label}
+                </NavLink>
+
+                <div
+                  id="parcerias-tooltip"
+                  role="tooltip"
+                  className="pointer-events-none invisible absolute left-1/2 top-full z-50 mt-3 w-72 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-white p-4 text-left opacity-0 shadow-xl transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                >
+                  <p className="text-xs font-bold text-ink">
+                    Como funcionam as parcerias?
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+                    {PARTNERSHIPS_DESCRIPTION}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <NavLink key={n.to} to={n.to} className={linkCls}>
+                {n.label}
+              </NavLink>
+            )
+          )}
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
           {user ? (
             <>
               {user.is_admin && (
-                <Link to="/admin" className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ink hover:text-brand">
+                <Link
+                  to="/admin"
+                  className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ink hover:text-brand"
+                >
                   <Shield size={14} /> Admin
                 </Link>
               )}
               <Link to="/minha-conta" className="btn-primary btn-sm !px-4 !py-2">
                 <UserIcon size={14} /> {user.name.split(" ")[0]}
               </Link>
-              <button onClick={doLogout} className="rounded-full p-2 text-ink-soft hover:bg-cream-2" aria-label="Sair" title="Sair">
+              <button
+                onClick={doLogout}
+                className="rounded-full p-2 text-ink-soft hover:bg-cream-2"
+                aria-label="Sair"
+                title="Sair"
+              >
                 <LogOut size={16} />
               </button>
             </>
           ) : (
             <>
-              <Link to="/entrar" className="px-2 text-[13px] font-bold text-ink hover:text-brand">
+              <Link
+                to="/entrar"
+                className="px-2 text-[13px] font-bold text-ink hover:text-brand"
+              >
                 Entrar
               </Link>
               <Link to="/cadastro" className="btn-primary btn-sm !px-4 !py-2">
@@ -92,26 +137,49 @@ function Header() {
         <div className="border-t border-line bg-cream lg:hidden">
           <nav className="container-x flex flex-col py-3" aria-label="Menu móvel">
             {NAV.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                className={({ isActive }) => `rounded-lg px-2 py-3 text-[15px] font-medium ${isActive ? "text-brand" : "text-ink"}`}
-              >
-                {n.label}
-              </NavLink>
+              <div key={n.to}>
+                <NavLink
+                  to={n.to}
+                  className={({ isActive }) =>
+                    `block rounded-lg px-2 py-3 text-[15px] font-medium ${
+                      isActive ? "text-brand" : "text-ink"
+                    }`
+                  }
+                >
+                  {n.label}
+                </NavLink>
+
+                {n.to === "/parcerias" && (
+                  <p className="px-2 pb-3 text-xs leading-relaxed text-ink-soft">
+                    {PARTNERSHIPS_DESCRIPTION}
+                  </p>
+                )}
+              </div>
             ))}
 
             <div className="mt-2 flex flex-col gap-2 border-t border-line pt-4">
               {user ? (
                 <>
-                  {user.is_admin && <Link to="/admin" className="btn-ghost">Administração</Link>}
-                  <Link to="/minha-conta" className="btn-primary">Minha conta</Link>
-                  <button onClick={doLogout} className="btn-ghost">Sair</button>
+                  {user.is_admin && (
+                    <Link to="/admin" className="btn-ghost">
+                      Administração
+                    </Link>
+                  )}
+                  <Link to="/minha-conta" className="btn-primary">
+                    Minha conta
+                  </Link>
+                  <button onClick={doLogout} className="btn-ghost">
+                    Sair
+                  </button>
                 </>
               ) : (
                 <>
-                  <Link to="/cadastro" className="btn-primary">Criar conta</Link>
-                  <Link to="/entrar" className="btn-ghost">Entrar</Link>
+                  <Link to="/cadastro" className="btn-primary">
+                    Criar conta
+                  </Link>
+                  <Link to="/entrar" className="btn-ghost">
+                    Entrar
+                  </Link>
                 </>
               )}
             </div>
@@ -132,26 +200,58 @@ function Footer() {
         <div>
           <Logo />
           <p className="mt-4 max-w-sm text-xs leading-relaxed text-ink-soft">
-            Um espaço para famílias e profissionais da {schoolName} se encontrarem e colaborarem.
+            Um espaço para famílias e profissionais da {schoolName} se
+            encontrarem e colaborarem.
           </p>
         </div>
 
         <div>
           <p className="eyebrow mb-4 !text-[10px]">Explore</p>
           <ul className="space-y-2.5 text-xs font-medium text-ink-soft">
-            <li><Link to="/categorias" className="hover:text-brand">Categorias</Link></li>
-            <li><Link to="/profissionais" className="hover:text-brand">Profissionais</Link></li>
-            <li><Link to="/parcerias" className="hover:text-brand">Parcerias</Link></li>
+            <li>
+              <Link to="/categorias" className="hover:text-brand">
+                Categorias
+              </Link>
+            </li>
+            <li>
+              <Link to="/profissionais" className="hover:text-brand">
+                Profissionais
+              </Link>
+            </li>
+            <li>
+              <Link to="/parcerias" className="hover:text-brand">
+                Parcerias
+              </Link>
+            </li>
           </ul>
         </div>
 
         <div>
           <p className="eyebrow mb-4 !text-[10px]">Conecta Escola</p>
           <ul className="space-y-2.5 text-xs font-medium text-ink-soft">
-            <li><Link to="/como-funciona" className="hover:text-brand">Como funciona</Link></li>
-            <li><Link to="/contato" className="inline-flex items-center gap-1 hover:text-brand">Fale com a equipe <ArrowUpRight size={11} /></Link></li>
-            <li><Link to="/cadastro" className="hover:text-brand">Criar conta</Link></li>
-            <li><Link to="/privacidade" className="hover:text-brand">Termos e privacidade</Link></li>
+            <li>
+              <Link to="/como-funciona" className="hover:text-brand">
+                Como funciona
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/contato"
+                className="inline-flex items-center gap-1 hover:text-brand"
+              >
+                Fale com a equipe <ArrowUpRight size={11} />
+              </Link>
+            </li>
+            <li>
+              <Link to="/cadastro" className="hover:text-brand">
+                Criar conta
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacidade" className="hover:text-brand">
+                Termos e privacidade
+              </Link>
+            </li>
           </ul>
         </div>
       </div>
@@ -173,7 +273,10 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2">
+      <a
+        href="#conteudo"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2"
+      >
         Pular para o conteúdo
       </a>
       <Header />
