@@ -7,3 +7,5 @@ backups/
 *.db-shm
 .env
 .DS_Store
+.env.*
+!.env.example
