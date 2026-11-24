@@ -13,6 +13,31 @@ import { h, int, uniqueSlug, zOptPhone, zPhone, zText } from "./util.js";
 
 export const api = Router();
 
+// ───────────────────────── Notificações ─────────────────────────
+
+function createNotification(
+  userId: number,
+  type: string,
+  title: string,
+  message: string,
+  link: string,
+  relatedType = "",
+  relatedId: number | null = null
+) {
+  run(
+    `INSERT INTO notifications
+      (user_id, type, title, message, link, related_type, related_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    userId,
+    type,
+    title,
+    message,
+    link,
+    relatedType,
+    relatedId
+  );
+}
+
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { error: "Muitas tentativas. Aguarde alguns minutos." } });
 const formLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false, message: { error: "Muitas solicitações. Aguarde alguns minutos." } });
 
@@ -91,7 +116,6 @@ function handlePortfolioUpload(req: any, res: any, next: any) {
 }
 
 function detectImageFormat(buffer: Buffer): { extension: string; mime: string } | null {
-  // JPEG
   if (
     buffer.length >= 3 &&
     buffer[0] === 0xff &&
@@ -101,7 +125,6 @@ function detectImageFormat(buffer: Buffer): { extension: string; mime: string } 
     return { extension: "jpg", mime: "image/jpeg" };
   }
 
-  // PNG
   if (
     buffer.length >= 8 &&
     buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
@@ -109,7 +132,6 @@ function detectImageFormat(buffer: Buffer): { extension: string; mime: string } 
     return { extension: "png", mime: "image/png" };
   }
 
-  // WebP
   if (
     buffer.length >= 12 &&
     buffer.toString("ascii", 0, 4) === "RIFF" &&
@@ -561,6 +583,53 @@ api.post("/auth/reset", authLimiter, h((req, res) => {
 
 // ───────────────────────── Minha conta ─────────────────────────
 
+// Listar notificações do usuário autenticado.
+api.get("/me/notifications", requireAuth, h((req, res) => {
+  const notifications = all(
+    `SELECT id, type, title, message, link, related_type, related_id, is_read, created_at
+     FROM notifications
+     WHERE user_id = ?
+     ORDER BY created_at DESC, id DESC
+     LIMIT 50`,
+    req.user!.id
+  );
+
+  const unread = one(
+    "SELECT COUNT(*) AS total FROM notifications WHERE user_id = ? AND is_read = 0",
+    req.user!.id
+  );
+
+  res.json({
+    notifications,
+    unread: Number(unread?.total || 0),
+  });
+}));
+
+// Marcar uma notificação como lida.
+api.patch("/me/notifications/:id/read", requireAuth, h((req, res) => {
+  const result = run(
+    "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
+    int(req.params.id),
+    req.user!.id
+  );
+
+  if (!result.changes) {
+    return res.status(404).json({ error: "Notificação não encontrada." });
+  }
+
+  res.json({ ok: true });
+}));
+
+// Marcar todas as notificações como lidas.
+api.post("/me/notifications/read-all", requireAuth, h((req, res) => {
+  run(
+    "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0",
+    req.user!.id
+  );
+
+  res.json({ ok: true });
+}));
+
 api.get("/me", requireAuth, h((req, res) => {
   const u = req.user!;
   const school = u.school_id ? one("SELECT id, name FROM schools WHERE id = ?", u.school_id) : null;
@@ -686,11 +755,43 @@ function visibleProfileBySlug(slug: string) {
 
 api.post("/professionals/:slug/quotes", requireApproved, formLimiter, h((req, res) => {
   const p = visibleProfileBySlug(String(req.params.slug));
-  if (!p) return res.status(404).json({ error: "Perfil não encontrado." });
-  if (p.user_id === req.user!.id) return res.status(400).json({ error: "Você não pode pedir orçamento a si mesmo." });
-  const { description } = z.object({ description: zText(2000, 10) }).parse(req.body);
-  run("INSERT INTO quote_requests (family_id, profile_id, description) VALUES (?, ?, ?)", req.user!.id, p.id, description);
-  res.status(201).json({ ok: true });
+
+  if (!p) {
+    return res.status(404).json({ error: "Perfil não encontrado." });
+  }
+
+  if (p.user_id === req.user!.id) {
+    return res.status(400).json({ error: "Você não pode pedir orçamento a si mesmo." });
+  }
+
+  const { description } = z.object({
+    description: zText(2000, 10),
+  }).parse(req.body);
+
+  const quoteId = tx(() => {
+    const result = run(
+      "INSERT INTO quote_requests (family_id, profile_id, description) VALUES (?, ?, ?)",
+      req.user!.id,
+      p.id,
+      description
+    );
+
+    const id = Number(result.lastInsertRowid);
+
+    createNotification(
+      p.user_id,
+      "quote",
+      "Novo pedido de orçamento",
+      `${req.user!.name} enviou um pedido de orçamento para seu serviço.`,
+      "/minha-conta?aba=orcamentos",
+      "quote",
+      id
+    );
+
+    return id;
+  });
+
+  res.status(201).json({ ok: true, id: quoteId });
 }));
 
 api.post("/professionals/:slug/reviews", requireApproved, formLimiter, h((req, res) => {
