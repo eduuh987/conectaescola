@@ -1,3 +1,4 @@
+
 import type { Request, Response, NextFunction } from "express";
 import { z, ZodError } from "zod";
 import { one } from "./db.js";
@@ -5,7 +6,7 @@ import { one } from "./db.js";
 export function slugify(s: string) {
   return s
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -13,12 +14,21 @@ export function slugify(s: string) {
 }
 
 export function uniqueSlug(base: string, table: string, ignoreId?: number) {
-  let slug = slugify(base);
+  // O nome da tabela é um identificador SQL e não pode ser parametrizado.
+  // Aceita somente identificadores simples e seguros.
+  if (!/^[a-z][a-z0-9_]*$/i.test(table)) {
+    throw new Error("Nome de tabela inválido.");
+  }
+
+  const baseSlug = slugify(base);
+  let slug = baseSlug;
   let i = 1;
+
   while (one(`SELECT id FROM ${table} WHERE slug = ? AND id != ?`, slug, ignoreId ?? -1)) {
     i += 1;
-    slug = `${slugify(base)}-${i}`;
+    slug = `${baseSlug}-${i}`;
   }
+
   return slug;
 }
 
@@ -61,6 +71,7 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
     for (const i of err.issues) fields[i.path.join(".") || "_"] ??= i.message;
     return res.status(400).json({ error: "Verifique os campos destacados.", fields });
   }
+
   // Nunca registrar corpo da requisição (pode conter senha).
   console.error("[erro]", err?.message || err);
   res.status(500).json({ error: "Erro inesperado. Tente novamente." });
