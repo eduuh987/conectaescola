@@ -179,10 +179,56 @@ export default function MinhaConta() {
                 <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">Cadastro concluído</p>
                 <h2 className="mt-2 text-2xl font-extrabold text-ink sm:text-3xl">Parabéns! Seu perfil profissional foi criado.</h2>
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">Agora você pode completar seus serviços, acompanhar pedidos de orçamento e conhecer oportunidades de parceria. {d.user.status !== "approved" ? "Seu perfil será exibido no diretório depois da aprovação da equipe da escola." : "Seu perfil já pode ser gerenciado pela sua conta."}</p>
-                <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                  <Link to="/" className="btn-ghost justify-center border border-line">Página inicial</Link>
-                  <button type="button" className="btn-primary justify-center" onClick={() => { setWizardStep(null); reload(); setParams({ aba: "perfil" }); }}>Meu perfil</button>
-                  <Link to="/parcerias" className="btn-ghost justify-center border border-line">Procurar parcerias</Link>
+
+                <div className="mt-8 grid items-start gap-3 sm:grid-cols-3">
+                  <Link
+                    to="/"
+                    className="btn-ghost justify-center border border-line"
+                  >
+                    Página inicial
+                  </Link>
+
+                  <button
+                    type="button"
+                    className="btn-primary justify-center"
+                    onClick={() => {
+                      setWizardStep(null);
+                      reload();
+                      setParams({ aba: "perfil" });
+                    }}
+                  >
+                    Meu perfil
+                  </button>
+
+                  <div className="group min-w-0">
+                    <Link
+                      to="/parcerias"
+                      className="btn-ghost flex w-full justify-center border border-line"
+                    >
+                      Procurar parcerias
+                    </Link>
+
+                    <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-500 ease-in-out group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
+                      <div className="overflow-hidden">
+                        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-left shadow-sm">
+                          <div className="flex items-center gap-2 font-extrabold text-sky-900">
+                            <Briefcase size={17} />
+                            O que são parcerias?
+                          </div>
+
+                          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                            É um espaço onde profissionais podem divulgar projetos,
+                            encontrar outras pessoas para colaborar e criar oportunidades
+                            de trabalho em conjunto.
+                          </p>
+
+                          <p className="mt-2 text-xs font-bold text-sky-800">
+                            Conheça oportunidades e conecte-se com outros profissionais!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
             )}
@@ -877,3 +923,4 @@ function PartnershipsTab({ me }: { me: Me }) {
     </ul>
   );
 }
+
