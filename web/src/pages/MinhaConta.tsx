@@ -1,12 +1,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, Briefcase, Camera, CheckCircle2, Clock, ExternalLink, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowRight, Bell, Briefcase, Camera, CheckCheck, CheckCircle2, Clock, ExternalLink, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, apiUpload, formatDate, maskPhone, useApi, useAuth, usePageTitle, whatsappLink, type User } from "../lib";
 import { Alert, Empty, ErrorState, Field, Input, Modal, Spinner, StatusBadge, Textarea } from "../ui";
 
 type Service = { id: number; title: string; description: string; price: string };
 type PortfolioImage = { id: number; image_url: string; created_at: string };
+
+type Notification = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  link: string;
+  related_type: string;
+  related_id: number | null;
+  is_read: number;
+  created_at: string;
+};
+
+type NotificationsResponse = {
+  notifications: Notification[];
+  unread: number;
+};
 
 type Me = {
   user: User;
@@ -32,6 +49,7 @@ export default function MinhaConta() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("aba") || "conta";
   const me = useApi<Me>("/me");
+  const notifications = useApi<NotificationsResponse>("/me/notifications");
 
   const [wizardStep, setWizardStep] = useState<OnboardingStep>(() =>
     params.get("novo") === "1" && params.get("aba") === "perfil" ? "avatar" : null
@@ -39,6 +57,15 @@ export default function MinhaConta() {
 
   const flowRef = useRef<HTMLDivElement>(null);
   const reload = () => { me.reload(); refresh(); };
+
+  // Atualiza as notificações automaticamente a cada 20 segundos.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      notifications.reload();
+    }, 20000);
+
+    return () => window.clearInterval(interval);
+  }, [notifications.reload]);
 
   useEffect(() => {
     if (wizardStep) {
@@ -52,6 +79,10 @@ export default function MinhaConta() {
   const d = me.data;
   const isProfessional = !!d.user.is_professional || !!d.profile;
   const isNew = params.get("novo") === "1";
+
+  const unreadQuoteCount = notifications.data?.notifications.filter(
+    (n) => n.type === "quote" && !n.is_read
+  ).length || 0;
 
   const startProfessionalFlow = () => {
     setParams({ aba: "perfil" });
@@ -76,6 +107,14 @@ export default function MinhaConta() {
     <div className="container-x py-8 sm:py-12">
       <h1 className="text-3xl font-extrabold">Olá, {d.user.name.split(" ")[0]}!</h1>
       <StatusCard me={d} onChange={reload} isNew={isNew} />
+
+      {!d.user.is_admin && (
+        <NotificationPanel
+          data={notifications.data}
+          loading={notifications.loading}
+          onReload={notifications.reload}
+        />
+      )}
 
       {isNew && !isProfessional && !d.user.is_admin && !wizardStep && (
         <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-sm sm:p-6">
@@ -121,9 +160,15 @@ export default function MinhaConta() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => { setWizardStep(null); setParams({ aba: t.id }); }}
-            className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab === t.id ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"}`}
+            className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab === t.id ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"}`}
           >
             {t.label}
+            {t.id === "orcamentos" && unreadQuoteCount > 0 && (
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -181,50 +226,16 @@ export default function MinhaConta() {
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">Agora você pode completar seus serviços, acompanhar pedidos de orçamento e conhecer oportunidades de parceria. {d.user.status !== "approved" ? "Seu perfil será exibido no diretório depois da aprovação da equipe da escola." : "Seu perfil já pode ser gerenciado pela sua conta."}</p>
 
                 <div className="mt-8 grid items-start gap-3 sm:grid-cols-3">
-                  <Link
-                    to="/"
-                    className="btn-ghost justify-center border border-line"
-                  >
-                    Página inicial
-                  </Link>
-
-                  <button
-                    type="button"
-                    className="btn-primary justify-center"
-                    onClick={() => {
-                      setWizardStep(null);
-                      reload();
-                      setParams({ aba: "perfil" });
-                    }}
-                  >
-                    Meu perfil
-                  </button>
-
+                  <Link to="/" className="btn-ghost justify-center border border-line">Página inicial</Link>
+                  <button type="button" className="btn-primary justify-center" onClick={() => { setWizardStep(null); reload(); setParams({ aba: "perfil" }); }}>Meu perfil</button>
                   <div className="group min-w-0">
-                    <Link
-                      to="/parcerias"
-                      className="btn-ghost flex w-full justify-center border border-line"
-                    >
-                      Procurar parcerias
-                    </Link>
-
+                    <Link to="/parcerias" className="btn-ghost flex w-full justify-center border border-line">Procurar parcerias</Link>
                     <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-500 ease-in-out group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
                       <div className="overflow-hidden">
                         <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-left shadow-sm">
-                          <div className="flex items-center gap-2 font-extrabold text-sky-900">
-                            <Briefcase size={17} />
-                            O que são parcerias?
-                          </div>
-
-                          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                            É um espaço onde profissionais podem divulgar projetos,
-                            encontrar outras pessoas para colaborar e criar oportunidades
-                            de trabalho em conjunto.
-                          </p>
-
-                          <p className="mt-2 text-xs font-bold text-sky-800">
-                            Conheça oportunidades e conecte-se com outros profissionais!
-                          </p>
+                          <div className="flex items-center gap-2 font-extrabold text-sky-900"><Briefcase size={17} /> O que são parcerias?</div>
+                          <p className="mt-2 text-sm leading-relaxed text-ink-soft">É um espaço onde profissionais podem divulgar projetos, encontrar outras pessoas para colaborar e criar oportunidades de trabalho em conjunto.</p>
+                          <p className="mt-2 text-xs font-bold text-sky-800">Conheça oportunidades e conecte-se com outros profissionais!</p>
                         </div>
                       </div>
                     </div>
@@ -254,6 +265,142 @@ export default function MinhaConta() {
         {tab === "parcerias" && isProfessional && <PartnershipsTab me={d} />}
       </div>
     </div>
+  );
+}
+
+function NotificationPanel({
+  data,
+  loading,
+  onReload,
+}: {
+  data?: NotificationsResponse;
+  loading: boolean;
+  onReload: () => void;
+}) {
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
+  const [error, setError] = useState("");
+
+  async function markRead(id: number) {
+    setBusyId(id);
+    setError("");
+
+    try {
+      await api(`/me/notifications/${id}/read`, { method: "PATCH" });
+      onReload();
+    } catch (e: any) {
+      setError(e.message || "Não foi possível atualizar a notificação.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function markAllRead() {
+    setMarkingAll(true);
+    setError("");
+
+    try {
+      await api("/me/notifications/read-all", { method: "POST" });
+      onReload();
+    } catch (e: any) {
+      setError(e.message || "Não foi possível atualizar as notificações.");
+    } finally {
+      setMarkingAll(false);
+    }
+  }
+
+  const items = data?.notifications || [];
+  const unread = data?.unread || 0;
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="relative grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-700">
+            <Bell size={20} />
+            {unread > 0 && <span className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full border-2 border-white bg-red-500" />}
+          </div>
+          <div>
+            <h2 className="font-extrabold text-ink">Notificações</h2>
+            <p className="text-xs text-ink-soft">
+              {unread > 0 ? `${unread} ${unread === 1 ? "notificação não lida" : "notificações não lidas"}` : "Você está em dia!"}
+            </p>
+          </div>
+        </div>
+
+        {unread > 0 && (
+          <button
+            type="button"
+            disabled={markingAll}
+            onClick={markAllRead}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline disabled:opacity-50"
+          >
+            <CheckCheck size={15} />
+            {markingAll ? "Atualizando..." : "Marcar todas como lidas"}
+          </button>
+        )}
+      </div>
+
+      {error && <div className="px-5 pt-4"><Alert>{error}</Alert></div>}
+
+      {loading && !data ? (
+        <div className="flex justify-center p-6"><Spinner /></div>
+      ) : items.length === 0 ? (
+        <div className="px-5 py-7 text-center">
+          <Bell className="mx-auto text-ink-mute" size={27} />
+          <p className="mt-2 text-sm font-bold text-ink">Nenhuma notificação por enquanto</p>
+          <p className="mt-1 text-xs text-ink-soft">Quando houver novidades na sua conta, elas aparecerão aqui.</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-line">
+          {items.map((notification) => (
+            <li
+              key={notification.id}
+              className={`flex gap-3 px-5 py-4 transition ${notification.is_read ? "bg-white" : "bg-sky-50/60"}`}
+            >
+              <div className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${notification.type === "quote" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}`}>
+                {notification.type === "quote" ? <Briefcase size={17} /> : <Bell size={17} />}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-extrabold text-ink">{notification.title}</p>
+                  {!notification.is_read && <span className="h-2 w-2 rounded-full bg-sky-600" />}
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-ink-soft">{notification.message}</p>
+                <p className="mt-2 text-xs text-ink-mute">{formatDate(notification.created_at)}</p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  {notification.link && (
+                    <Link
+                      to={notification.link}
+                      onClick={() => {
+                        if (!notification.is_read) markRead(notification.id);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-extrabold text-brand hover:underline"
+                    >
+                      {notification.type === "quote" ? "Ver orçamento" : "Ver detalhes"}
+                      <ArrowRight size={13} />
+                    </Link>
+                  )}
+
+                  {!notification.is_read && (
+                    <button
+                      type="button"
+                      disabled={busyId === notification.id}
+                      onClick={() => markRead(notification.id)}
+                      className="text-xs font-semibold text-ink-soft hover:text-brand disabled:opacity-50"
+                    >
+                      {busyId === notification.id ? "Atualizando..." : "Marcar como lida"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -374,50 +521,22 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-brand-light font-display text-2xl font-extrabold text-brand">
           {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={`Foto de perfil de ${user.name}`}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            initials
-          )}
+            <img src={avatarUrl} alt={`Foto de perfil de ${user.name}`} className="h-full w-full object-cover" />
+          ) : initials}
         </div>
 
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold">Foto de perfil</h2>
-          <p className="mt-1 text-sm text-ink-soft">
-            Escolha uma foto sua para deixar sua conta mais pessoal e facilitar sua identificação na comunidade.
-          </p>
+          <p className="mt-1 text-sm text-ink-soft">Escolha uma foto sua para deixar sua conta mais pessoal e facilitar sua identificação na comunidade.</p>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => choosePhoto(e.target.files?.[0])}
-            />
-
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={busy}
-              onClick={() => inputRef.current?.click()}
-            >
-              <Camera size={16} />
-              {busy ? "Aguarde..." : avatarUrl ? "Trocar foto" : "Escolher foto"}
+            <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => choosePhoto(e.target.files?.[0])} />
+            <button type="button" className="btn-primary" disabled={busy} onClick={() => inputRef.current?.click()}>
+              <Camera size={16} /> {busy ? "Aguarde..." : avatarUrl ? "Trocar foto" : "Escolher foto"}
             </button>
-
             {avatarUrl && (
-              <button
-                type="button"
-                className="btn-ghost"
-                disabled={busy}
-                onClick={removePhoto}
-              >
-                <Trash2 size={16} />
-                Remover
+              <button type="button" className="btn-ghost" disabled={busy} onClick={removePhoto}>
+                <Trash2 size={16} /> Remover
               </button>
             )}
           </div>
@@ -426,10 +545,7 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
 
       {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       {success && <div className="mt-4"><Alert kind="success">{success}</Alert></div>}
-
-      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">
-        Formatos aceitos: JPG, PNG e WebP. Tamanho máximo: 5 MB. Ao adicionar uma foto, você concorda que ela poderá ficar visível publicamente no Conecta Escola, inclusive no seu perfil profissional.
-      </p>
+      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">Formatos aceitos: JPG, PNG e WebP. Tamanho máximo: 5 MB. Ao adicionar uma foto, você concorda que ela poderá ficar visível publicamente no Conecta Escola, inclusive no seu perfil profissional.</p>
     </section>
   );
 }
@@ -509,32 +625,17 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold">Meu portfólio</h2>
-          <p className="mt-1 text-sm text-ink-soft">
-            Mostre fotos dos seus trabalhos para que as famílias conheçam melhor seus serviços.
-          </p>
+          <p className="mt-1 text-sm text-ink-soft">Mostre fotos dos seus trabalhos para que as famílias conheçam melhor seus serviços.</p>
         </div>
-        <span className="rounded-full bg-brand-light px-3 py-1 text-xs font-bold text-brand">
-          {images.length}/8 fotos
-        </span>
+        <span className="rounded-full bg-brand-light px-3 py-1 text-xs font-bold text-brand">{images.length}/8 fotos</span>
       </div>
 
       {images.length > 0 ? (
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {images.map((photo) => (
             <div key={photo.id} className="group relative overflow-hidden rounded-xl border border-line bg-cream-2">
-              <img
-                src={photo.image_url}
-                alt="Foto de trabalho do portfólio"
-                loading="lazy"
-                className="aspect-square w-full object-cover"
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => removePhoto(photo)}
-                aria-label="Remover foto do portfólio"
-                className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-red-600 shadow transition hover:bg-red-50 disabled:opacity-50"
-              >
+              <img src={photo.image_url} alt="Foto de trabalho do portfólio" loading="lazy" className="aspect-square w-full object-cover" />
+              <button type="button" disabled={busy} onClick={() => removePhoto(photo)} aria-label="Remover foto do portfólio" className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-red-600 shadow transition hover:bg-red-50 disabled:opacity-50">
                 <Trash2 size={16} />
               </button>
             </div>
@@ -550,38 +651,17 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
 
       {remaining > 0 && (
         <div className="mt-5">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={(e) => uploadPhotos(e.target.files)}
-          />
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={busy}
-            onClick={() => inputRef.current?.click()}
-          >
-            <ImagePlus size={16} />
-            {busy ? "Enviando fotos..." : "Adicionar fotos"}
+          <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(e) => uploadPhotos(e.target.files)} />
+          <button type="button" className="btn-primary" disabled={busy} onClick={() => inputRef.current?.click()}>
+            <ImagePlus size={16} /> {busy ? "Enviando fotos..." : "Adicionar fotos"}
           </button>
         </div>
       )}
 
-      {remaining === 0 && (
-        <p className="mt-4 text-xs font-medium text-ink-soft">
-          Você atingiu o limite de 8 fotos. Remova alguma imagem para adicionar outra.
-        </p>
-      )}
-
+      {remaining === 0 && <p className="mt-4 text-xs font-medium text-ink-soft">Você atingiu o limite de 8 fotos. Remova alguma imagem para adicionar outra.</p>}
       {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       {success && <div className="mt-4"><Alert kind="success">{success}</Alert></div>}
-
-      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">
-        São permitidas até 8 imagens. Formatos aceitos: JPG, PNG e WebP. Cada imagem pode ter no máximo 5 MB. As fotos poderão ficar visíveis publicamente no seu perfil profissional.
-      </p>
+      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">São permitidas até 8 imagens. Formatos aceitos: JPG, PNG e WebP. Cada imagem pode ter no máximo 5 MB. As fotos poderão ficar visíveis publicamente no seu perfil profissional.</p>
     </section>
   );
 }
@@ -597,20 +677,17 @@ function AccountTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
       <AvatarEditor user={me.user} onSaved={onSaved} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <form
-          className="card space-y-4 p-6"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setSt({ busy: true });
-            try {
-              await api("/me", { method: "PUT", body: { ...f, school_id: me.user.school_id } });
-              setSt({ ok: "Dados atualizados." });
-              onSaved();
-            } catch (e: any) {
-              setSt({ err: e.message, fields: e.fields });
-            }
-          }}
-        >
+        <form className="card space-y-4 p-6" onSubmit={async (e) => {
+          e.preventDefault();
+          setSt({ busy: true });
+          try {
+            await api("/me", { method: "PUT", body: { ...f, school_id: me.user.school_id } });
+            setSt({ ok: "Dados atualizados." });
+            onSaved();
+          } catch (e: any) {
+            setSt({ err: e.message, fields: e.fields });
+          }
+        }}>
           <h2 className="text-lg font-bold">Dados da conta</h2>
           {st.err && <Alert>{st.err}</Alert>}
           {st.ok && <Alert kind="success">{st.ok}</Alert>}
@@ -626,20 +703,17 @@ function AccountTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
           <button className="btn-primary" disabled={st.busy}>{st.busy ? "Salvando…" : "Salvar"}</button>
         </form>
 
-        <form
-          className="card space-y-4 p-6 lg:self-start"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setPst({ busy: true });
-            try {
-              await api("/me/password", { method: "PUT", body: pw });
-              setPst({ ok: true });
-              setPw({ current: "", password: "" });
-            } catch (e: any) {
-              setPst({ err: e.message, fields: e.fields });
-            }
-          }}
-        >
+        <form className="card space-y-4 p-6 lg:self-start" onSubmit={async (e) => {
+          e.preventDefault();
+          setPst({ busy: true });
+          try {
+            await api("/me/password", { method: "PUT", body: pw });
+            setPst({ ok: true });
+            setPw({ current: "", password: "" });
+          } catch (e: any) {
+            setPst({ err: e.message, fields: e.fields });
+          }
+        }}>
           <h2 className="text-lg font-bold">Trocar senha</h2>
           {pst.err && <Alert>{pst.err}</Alert>}
           {pst.ok && <Alert kind="success">Senha alterada.</Alert>}
@@ -681,22 +755,19 @@ function ProfileTab({ me, onSaved, isWizard = false, onNext }: { me: Me; onSaved
 
   return (
     <div className={isWizard ? "max-w-4xl" : "grid gap-6 lg:grid-cols-[1.4fr_1fr]"}>
-      <form
-        className="card space-y-4 p-6"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setSt({ busy: true });
-          try {
-            await api("/me/profile", { method: "PUT", body: f });
-            setSt({ ok: true });
-            onSaved();
-            if (isWizard) onNext?.();
-          } catch (e: any) {
-            setSt({ err: e.message, fields: e.fields });
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        }}
-      >
+      <form className="card space-y-4 p-6" onSubmit={async (e) => {
+        e.preventDefault();
+        setSt({ busy: true });
+        try {
+          await api("/me/profile", { method: "PUT", body: f });
+          setSt({ ok: true });
+          onSaved();
+          if (isWizard) onNext?.();
+        } catch (e: any) {
+          setSt({ err: e.message, fields: e.fields });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">{p ? "Editar perfil profissional" : "Criar meu perfil profissional"}</h2>
           {p && me.user.status === "approved" && f.published && !p.hidden_by_admin && (
@@ -805,11 +876,7 @@ function ServicesEditor({ services, onChange }: { services: Service[]; onChange:
               </div>
               <div className="flex shrink-0 gap-1">
                 <button className="rounded-full p-2 text-ink-soft hover:bg-cream-2" onClick={() => setEdit(s)} aria-label={`Editar ${s.title}`}><Pencil size={14} /></button>
-                <button
-                  className="rounded-full p-2 text-ink-soft hover:bg-red-50 hover:text-red-700"
-                  aria-label={`Excluir ${s.title}`}
-                  onClick={async () => { if (confirm(`Excluir o serviço "${s.title}"?`)) { await api(`/me/services/${s.id}`, { method: "DELETE" }); onChange(); } }}
-                >
+                <button className="rounded-full p-2 text-ink-soft hover:bg-red-50 hover:text-red-700" aria-label={`Excluir ${s.title}`} onClick={async () => { if (confirm(`Excluir o serviço "${s.title}"?`)) { await api(`/me/services/${s.id}`, { method: "DELETE" }); onChange(); } }}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -818,20 +885,17 @@ function ServicesEditor({ services, onChange }: { services: Service[]; onChange:
         </ul>
       )}
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? "Editar serviço" : "Novo serviço"}>
-        <form
-          className="space-y-4"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setSt({ busy: true });
-            try {
-              await api(edit!.id ? `/me/services/${edit!.id}` : "/me/services", { method: edit!.id ? "PUT" : "POST", body: f });
-              setEdit(null);
-              onChange();
-            } catch (e: any) {
-              setSt({ err: e.message, fields: e.fields });
-            }
-          }}
-        >
+        <form className="space-y-4" onSubmit={async (e) => {
+          e.preventDefault();
+          setSt({ busy: true });
+          try {
+            await api(edit!.id ? `/me/services/${edit!.id}` : "/me/services", { method: edit!.id ? "PUT" : "POST", body: f });
+            setEdit(null);
+            onChange();
+          } catch (e: any) {
+            setSt({ err: e.message, fields: e.fields });
+          }
+        }}>
           {st.err && <Alert>{st.err}</Alert>}
           <Field id="s-title" label="Nome do serviço" error={st.fields?.title}>
             <Input id="s-title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} error={st.fields?.title} />
@@ -871,12 +935,7 @@ function QuotesTab({ me, onChange }: { me: Me; onChange: () => void }) {
                       <a className="btn btn-sm bg-[#1f9d55] text-white hover:bg-[#188046]" target="_blank" rel="noreferrer" href={whatsappLink(q.family_phone, `Olá, ${q.family_name.split(" ")[0]}! Recebi seu pedido de orçamento pelo Conecta Escola.`)}>WhatsApp</a>
                     )}
                     <a className="btn-ghost btn-sm" href={`mailto:${q.family_email}`}>E-mail</a>
-                    <select
-                      aria-label="Situação do pedido"
-                      className="input !w-auto !py-1.5 text-xs"
-                      value={q.status}
-                      onChange={async (e) => { await api(`/me/quotes/${q.id}`, { method: "PATCH", body: { status: e.target.value } }); onChange(); }}
-                    >
+                    <select aria-label="Situação do pedido" className="input !w-auto !py-1.5 text-xs" value={q.status} onChange={async (e) => { await api(`/me/quotes/${q.id}`, { method: "PATCH", body: { status: e.target.value } }); onChange(); }}>
                       {Object.entries(QUOTE_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
@@ -923,4 +982,3 @@ function PartnershipsTab({ me }: { me: Me }) {
     </ul>
   );
 }
-
