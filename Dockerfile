@@ -1,3 +1,4 @@
+
 # ---------- build do frontend ----------
 FROM node:22-alpine AS web
 WORKDIR /app/web
@@ -10,7 +11,7 @@ RUN npm run build
 FROM node:22-alpine AS server
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm install
+RUN npm ci
 COPY server/ ./
 RUN npm run build && npm prune --omit=dev
 
