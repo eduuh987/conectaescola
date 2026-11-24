@@ -20,11 +20,13 @@ function Header() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [showPartnershipsTooltip, setShowPartnershipsTooltip] = useState(false);
   const loc = useLocation();
   const nav = useNavigate();
 
   useEffect(() => {
     setOpen(false);
+    setShowPartnershipsTooltip(false);
   }, [loc.pathname]);
 
   useEffect(() => {
@@ -55,29 +57,39 @@ function Header() {
         <nav className="hidden items-center gap-6 lg:flex" aria-label="Principal">
           {NAV.map((n) =>
             n.to === "/parcerias" ? (
-              <div key={n.to} className="group relative">
+              <div
+                key={n.to}
+                className="relative"
+                onMouseEnter={() => setShowPartnershipsTooltip(true)}
+                onMouseLeave={() => setShowPartnershipsTooltip(false)}
+                onFocus={() => setShowPartnershipsTooltip(true)}
+                onBlur={() => setShowPartnershipsTooltip(false)}
+              >
                 <NavLink
                   to={n.to}
                   className={linkCls}
                   aria-describedby="parcerias-tooltip"
+                  aria-expanded={showPartnershipsTooltip}
                 >
                   {n.label}
                 </NavLink>
 
-                <div
-                  id="parcerias-tooltip"
-                  role="tooltip"
-                  className="invisible pointer-events-none absolute left-1/2 top-full z-50 w-72 -translate-x-1/2 translate-y-1 pt-3 text-left opacity-0 transition-all duration-200 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                >
-                  <div className="rounded-xl border border-line bg-white p-4 shadow-xl">
-                    <p className="text-xs font-bold text-ink">
-                      Como funcionam as parcerias?
-                    </p>
-                    <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-                      {PARTNERSHIPS_DESCRIPTION}
-                    </p>
+                {showPartnershipsTooltip && (
+                  <div
+                    id="parcerias-tooltip"
+                    role="tooltip"
+                    className="absolute left-1/2 top-full z-[100] w-72 -translate-x-1/2 pt-3"
+                  >
+                    <div className="rounded-xl border border-line bg-white p-4 text-left shadow-xl">
+                      <p className="text-xs font-bold text-ink">
+                        Como funcionam as parcerias?
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+                        {PARTNERSHIPS_DESCRIPTION}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <NavLink key={n.to} to={n.to} className={linkCls}>
