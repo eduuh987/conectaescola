@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ArrowUpRight, LogOut, Menu, Shield, User as UserIcon, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, LogOut, Menu, Shield, User as UserIcon, X } from "lucide-react";
 import { useAuth, useSite } from "./lib";
 import { Logo } from "./ui";
 
@@ -9,7 +9,7 @@ const NAV = [
   { to: "/como-funciona", label: "Como funciona" },
   { to: "/categorias", label: "Categorias" },
   { to: "/profissionais", label: "Profissionais" },
-  { to: "/parcerias", label: "Parcerias" },
+  { to: "/parcerias", label: "Procurar parcerias" },
   { to: "/contato", label: "Contato" },
 ];
 
@@ -20,13 +20,11 @@ function Header() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [showPartnershipsTooltip, setShowPartnershipsTooltip] = useState(false);
   const loc = useLocation();
   const nav = useNavigate();
 
   useEffect(() => {
     setOpen(false);
-    setShowPartnershipsTooltip(false);
   }, [loc.pathname]);
 
   useEffect(() => {
@@ -57,39 +55,54 @@ function Header() {
         <nav className="hidden items-center gap-6 lg:flex" aria-label="Principal">
           {NAV.map((n) =>
             n.to === "/parcerias" ? (
-              <div
-                key={n.to}
-                className="relative"
-                onMouseEnter={() => setShowPartnershipsTooltip(true)}
-                onMouseLeave={() => setShowPartnershipsTooltip(false)}
-                onFocus={() => setShowPartnershipsTooltip(true)}
-                onBlur={() => setShowPartnershipsTooltip(false)}
-              >
+              <div key={n.to} className="group relative py-5">
                 <NavLink
                   to={n.to}
-                  className={linkCls}
-                  aria-describedby="parcerias-tooltip"
-                  aria-expanded={showPartnershipsTooltip}
+                  className={({ isActive }) =>
+                    `inline-flex items-center gap-1.5 text-[13px] font-medium transition hover:text-brand ${
+                      isActive ? "text-brand" : "text-ink-soft"
+                    }`
+                  }
+                  aria-haspopup="true"
                 >
                   {n.label}
+                  <ChevronDown
+                    size={13}
+                    className="transition-transform duration-300 group-hover:rotate-180 group-focus-within:rotate-180"
+                  />
                 </NavLink>
 
-                {showPartnershipsTooltip && (
-                  <div
-                    id="parcerias-tooltip"
-                    role="tooltip"
-                    className="absolute left-1/2 top-full z-[100] w-72 -translate-x-1/2 pt-3"
-                  >
-                    <div className="rounded-xl border border-line bg-white p-4 text-left shadow-xl">
-                      <p className="text-xs font-bold text-ink">
-                        Como funcionam as parcerias?
-                      </p>
-                      <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-                        {PARTNERSHIPS_DESCRIPTION}
-                      </p>
+                <div
+                  className="invisible absolute left-1/2 top-full z-[100] w-80 -translate-x-1/2 -translate-y-2 pt-2 opacity-0 transition-all duration-300 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                >
+                  <div className="rounded-2xl border border-line bg-white p-5 text-left shadow-xl">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                        <UserIcon size={17} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-ink">
+                          Como funcionam as parcerias?
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-mute">
+                          Colaboração e oportunidades
+                        </p>
+                      </div>
                     </div>
+
+                    <p className="text-xs leading-relaxed text-ink-soft">
+                      {PARTNERSHIPS_DESCRIPTION}
+                    </p>
+
+                    <Link
+                      to="/parcerias"
+                      className="mt-4 flex items-center justify-between rounded-xl bg-cream-2 px-4 py-3 text-xs font-bold text-brand transition hover:bg-brand hover:text-white"
+                    >
+                      Explorar parcerias
+                      <ArrowUpRight size={15} />
+                    </Link>
                   </div>
-                )}
+                </div>
               </div>
             ) : (
               <NavLink key={n.to} to={n.to} className={linkCls}>
@@ -164,9 +177,17 @@ function Header() {
                 </NavLink>
 
                 {n.to === "/parcerias" && (
-                  <p className="px-2 pb-3 text-xs leading-relaxed text-ink-soft">
-                    {PARTNERSHIPS_DESCRIPTION}
-                  </p>
+                  <div className="mx-2 mb-3 rounded-xl border border-line bg-white p-3">
+                    <p className="text-xs leading-relaxed text-ink-soft">
+                      {PARTNERSHIPS_DESCRIPTION}
+                    </p>
+                    <Link
+                      to="/parcerias"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-brand"
+                    >
+                      Explorar parcerias <ArrowUpRight size={13} />
+                    </Link>
+                  </div>
                 )}
               </div>
             ))}
@@ -234,7 +255,7 @@ function Footer() {
             </li>
             <li>
               <Link to="/parcerias" className="hover:text-brand">
-                Parcerias
+                Procurar parcerias
               </Link>
             </li>
           </ul>
