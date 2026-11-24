@@ -1,7 +1,7 @@
 
-import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, Bell, Briefcase, Camera, CheckCheck, CheckCircle2, Clock, ExternalLink, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { ArrowRight, Bell, Briefcase, Camera, Check, CheckCheck, CheckCircle2, Clock, ExternalLink, ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, apiUpload, formatDate, maskPhone, useApi, useAuth, usePageTitle, whatsappLink, type User } from "../lib";
 import { Alert, Empty, ErrorState, Field, Input, Modal, Spinner, StatusBadge, Textarea } from "../ui";
 
@@ -47,9 +47,14 @@ export default function MinhaConta() {
   usePageTitle("Minha conta");
   const { refresh } = useAuth();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const tab = params.get("aba") || "conta";
   const me = useApi<Me>("/me");
-  const notifications = useApi<NotificationsResponse>("/me/notifications");
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   const [wizardStep, setWizardStep] = useState<OnboardingStep>(() =>
     params.get("novo") === "1" && params.get("aba") === "perfil" ? "avatar" : null
@@ -58,14 +63,59 @@ export default function MinhaConta() {
   const flowRef = useRef<HTMLDivElement>(null);
   const reload = () => { me.reload(); refresh(); };
 
-  // Atualiza as notificações automaticamente a cada 20 segundos.
+  const loadNotifications = useCallback(async () => {
+    try {
+      const result = await api<NotificationsResponse>("/me/notifications");
+      setNotifications(result.notifications || []);
+      setUnreadNotifications(result.unread || 0);
+    } catch {
+      // Mantém a conta funcionando caso a consulta falhe.
+    }
+  }, []);
+
   useEffect(() => {
+    loadNotifications();
+
     const interval = window.setInterval(() => {
-      notifications.reload();
-    }, 20000);
+      loadNotifications();
+    }, 30000);
 
     return () => window.clearInterval(interval);
-  }, [notifications.reload]);
+  }, [loadNotifications]);
+
+  async function markNotificationRead(id: number) {
+    try {
+      await api(`/me/notifications/${id}/read`, { method: "PATCH" });
+      await loadNotifications();
+    } catch {
+      // A próxima atualização automática tentará novamente.
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    setNotificationsLoading(true);
+
+    try {
+      await api("/me/notifications/read-all", { method: "POST" });
+      await loadNotifications();
+    } catch {
+      // Mantém a lista disponível em caso de erro.
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }
+
+  async function openNotification(notification: Notification) {
+    if (!notification.is_read) {
+      await markNotificationRead(notification.id);
+    }
+
+    setNotificationsOpen(false);
+
+    if (notification.link) {
+      navigate(notification.link);
+    }
+  }
 
   useEffect(() => {
     if (wizardStep) {
@@ -80,9 +130,9 @@ export default function MinhaConta() {
   const isProfessional = !!d.user.is_professional || !!d.profile;
   const isNew = params.get("novo") === "1";
 
-  const unreadQuoteCount = notifications.data?.notifications.filter(
-    (n) => n.type === "quote" && !n.is_read
-  ).length || 0;
+  const hasNewQuotes = notifications.some(
+    (notification) => notification.type === "quote" && notification.is_read === 0
+  );
 
   const startProfessionalFlow = () => {
     setParams({ aba: "perfil" });
@@ -108,13 +158,116 @@ export default function MinhaConta() {
       <h1 className="text-3xl font-extrabold">Olá, {d.user.name.split(" ")[0]}!</h1>
       <StatusCard me={d} onChange={reload} isNew={isNew} />
 
-      {!d.user.is_admin && (
-        <NotificationPanel
-          data={notifications.data}
-          loading={notifications.loading}
-          onReload={notifications.reload}
-        />
-      )}
+      <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setNotificationsOpen(!notificationsOpen)}
+          className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
+          aria-expanded={notificationsOpen}
+        >
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+              <Bell size={21} />
+              {unreadNotifications > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-extrabold text-white">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <h2 className="font-extrabold text-ink">Notificações</h2>
+              <p className="text-xs text-ink-soft">
+                {unreadNotifications > 0
+                  ? `${unreadNotifications} notificação(ões) não lida(s)`
+                  : "Você está em dia!"}
+              </p>
+            </div>
+          </div>
+
+          <ArrowRight
+            size={18}
+            className={`text-ink-soft transition-transform ${notificationsOpen ? "rotate-90" : ""}`}
+          />
+        </button>
+
+        {notificationsOpen && (
+          <div className="border-t border-line p-4 sm:p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold text-ink">Suas notificações</p>
+
+              {unreadNotifications > 0 && (
+                <button
+                  type="button"
+                  disabled={notificationsLoading}
+                  onClick={markAllNotificationsRead}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline disabled:opacity-50"
+                >
+                  <CheckCheck size={14} />
+                  Marcar todas como lidas
+                </button>
+              )}
+            </div>
+
+            {notifications.length === 0 ? (
+              <div className="rounded-xl bg-cream-2 px-4 py-7 text-center">
+                <Bell className="mx-auto text-ink-mute" size={27} />
+                <p className="mt-2 text-sm font-bold text-ink">Nenhuma notificação por enquanto</p>
+                <p className="mt-1 text-xs text-ink-soft">
+                  Quando houver novidades na sua conta, elas aparecerão aqui.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {notifications.map((notification) => (
+                  <li key={notification.id}>
+                    <button
+                      type="button"
+                      onClick={() => openNotification(notification)}
+                      className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition hover:border-sky-300 hover:bg-sky-50/50 ${
+                        notification.is_read
+                          ? "border-line bg-white"
+                          : "border-sky-200 bg-sky-50/60"
+                      }`}
+                    >
+                      <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        notification.type === "quote"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-sky-100 text-sky-700"
+                      }`}>
+                        {notification.type === "quote" ? <Briefcase size={17} /> : <Bell size={17} />}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-extrabold text-ink">{notification.title}</span>
+                          {!notification.is_read && (
+                            <span className="h-2 w-2 rounded-full bg-sky-600" />
+                          )}
+                        </span>
+
+                        <span className="mt-1 block text-xs leading-relaxed text-ink-soft">
+                          {notification.message}
+                        </span>
+
+                        <span className="mt-2 block text-[11px] text-ink-mute">
+                          {formatDate(notification.created_at)}
+                        </span>
+                      </span>
+
+                      {!notification.is_read && (
+                        <span className="shrink-0 text-brand">
+                          <Check size={16} />
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
 
       {isNew && !isProfessional && !d.user.is_admin && !wizardStep && (
         <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-sm sm:p-6">
@@ -160,13 +313,13 @@ export default function MinhaConta() {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => { setWizardStep(null); setParams({ aba: t.id }); }}
-            className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab === t.id ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"}`}
+            className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab === t.id ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"}`}
           >
             {t.label}
-            {t.id === "orcamentos" && unreadQuoteCount > 0 && (
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
+            {t.id === "orcamentos" && hasNewQuotes && (
+              <span className="relative flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
               </span>
             )}
           </button>
@@ -227,15 +380,37 @@ export default function MinhaConta() {
 
                 <div className="mt-8 grid items-start gap-3 sm:grid-cols-3">
                   <Link to="/" className="btn-ghost justify-center border border-line">Página inicial</Link>
-                  <button type="button" className="btn-primary justify-center" onClick={() => { setWizardStep(null); reload(); setParams({ aba: "perfil" }); }}>Meu perfil</button>
+                  <button
+                    type="button"
+                    className="btn-primary justify-center"
+                    onClick={() => {
+                      setWizardStep(null);
+                      reload();
+                      setParams({ aba: "perfil" });
+                    }}
+                  >
+                    Meu perfil
+                  </button>
+
                   <div className="group min-w-0">
-                    <Link to="/parcerias" className="btn-ghost flex w-full justify-center border border-line">Procurar parcerias</Link>
+                    <Link to="/parcerias" className="btn-ghost flex w-full justify-center border border-line">
+                      Procurar parcerias
+                    </Link>
                     <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-500 ease-in-out group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100">
                       <div className="overflow-hidden">
                         <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-left shadow-sm">
-                          <div className="flex items-center gap-2 font-extrabold text-sky-900"><Briefcase size={17} /> O que são parcerias?</div>
-                          <p className="mt-2 text-sm leading-relaxed text-ink-soft">É um espaço onde profissionais podem divulgar projetos, encontrar outras pessoas para colaborar e criar oportunidades de trabalho em conjunto.</p>
-                          <p className="mt-2 text-xs font-bold text-sky-800">Conheça oportunidades e conecte-se com outros profissionais!</p>
+                          <div className="flex items-center gap-2 font-extrabold text-sky-900">
+                            <Briefcase size={17} />
+                            O que são parcerias?
+                          </div>
+                          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                            É um espaço onde profissionais podem divulgar projetos,
+                            encontrar outras pessoas para colaborar e criar oportunidades
+                            de trabalho em conjunto.
+                          </p>
+                          <p className="mt-2 text-xs font-bold text-sky-800">
+                            Conheça oportunidades e conecte-se com outros profissionais!
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -265,142 +440,6 @@ export default function MinhaConta() {
         {tab === "parcerias" && isProfessional && <PartnershipsTab me={d} />}
       </div>
     </div>
-  );
-}
-
-function NotificationPanel({
-  data,
-  loading,
-  onReload,
-}: {
-  data?: NotificationsResponse;
-  loading: boolean;
-  onReload: () => void;
-}) {
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [markingAll, setMarkingAll] = useState(false);
-  const [error, setError] = useState("");
-
-  async function markRead(id: number) {
-    setBusyId(id);
-    setError("");
-
-    try {
-      await api(`/me/notifications/${id}/read`, { method: "PATCH" });
-      onReload();
-    } catch (e: any) {
-      setError(e.message || "Não foi possível atualizar a notificação.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function markAllRead() {
-    setMarkingAll(true);
-    setError("");
-
-    try {
-      await api("/me/notifications/read-all", { method: "POST" });
-      onReload();
-    } catch (e: any) {
-      setError(e.message || "Não foi possível atualizar as notificações.");
-    } finally {
-      setMarkingAll(false);
-    }
-  }
-
-  const items = data?.notifications || [];
-  const unread = data?.unread || 0;
-
-  return (
-    <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="relative grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-700">
-            <Bell size={20} />
-            {unread > 0 && <span className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full border-2 border-white bg-red-500" />}
-          </div>
-          <div>
-            <h2 className="font-extrabold text-ink">Notificações</h2>
-            <p className="text-xs text-ink-soft">
-              {unread > 0 ? `${unread} ${unread === 1 ? "notificação não lida" : "notificações não lidas"}` : "Você está em dia!"}
-            </p>
-          </div>
-        </div>
-
-        {unread > 0 && (
-          <button
-            type="button"
-            disabled={markingAll}
-            onClick={markAllRead}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline disabled:opacity-50"
-          >
-            <CheckCheck size={15} />
-            {markingAll ? "Atualizando..." : "Marcar todas como lidas"}
-          </button>
-        )}
-      </div>
-
-      {error && <div className="px-5 pt-4"><Alert>{error}</Alert></div>}
-
-      {loading && !data ? (
-        <div className="flex justify-center p-6"><Spinner /></div>
-      ) : items.length === 0 ? (
-        <div className="px-5 py-7 text-center">
-          <Bell className="mx-auto text-ink-mute" size={27} />
-          <p className="mt-2 text-sm font-bold text-ink">Nenhuma notificação por enquanto</p>
-          <p className="mt-1 text-xs text-ink-soft">Quando houver novidades na sua conta, elas aparecerão aqui.</p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-line">
-          {items.map((notification) => (
-            <li
-              key={notification.id}
-              className={`flex gap-3 px-5 py-4 transition ${notification.is_read ? "bg-white" : "bg-sky-50/60"}`}
-            >
-              <div className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${notification.type === "quote" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}`}>
-                {notification.type === "quote" ? <Briefcase size={17} /> : <Bell size={17} />}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-extrabold text-ink">{notification.title}</p>
-                  {!notification.is_read && <span className="h-2 w-2 rounded-full bg-sky-600" />}
-                </div>
-                <p className="mt-1 text-sm leading-relaxed text-ink-soft">{notification.message}</p>
-                <p className="mt-2 text-xs text-ink-mute">{formatDate(notification.created_at)}</p>
-
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  {notification.link && (
-                    <Link
-                      to={notification.link}
-                      onClick={() => {
-                        if (!notification.is_read) markRead(notification.id);
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-extrabold text-brand hover:underline"
-                    >
-                      {notification.type === "quote" ? "Ver orçamento" : "Ver detalhes"}
-                      <ArrowRight size={13} />
-                    </Link>
-                  )}
-
-                  {!notification.is_read && (
-                    <button
-                      type="button"
-                      disabled={busyId === notification.id}
-                      onClick={() => markRead(notification.id)}
-                      className="text-xs font-semibold text-ink-soft hover:text-brand disabled:opacity-50"
-                    >
-                      {busyId === notification.id ? "Atualizando..." : "Marcar como lida"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
 
@@ -459,24 +498,20 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
 
   async function choosePhoto(file?: File) {
     if (!file) return;
-
     setError("");
     setSuccess("");
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
     if (!allowedTypes.includes(file.type)) {
       setError("Escolha uma imagem JPG, PNG ou WebP.");
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       setError("A imagem deve ter no máximo 5 MB.");
       return;
     }
 
     setBusy(true);
-
     try {
       const result = await apiUpload<{ ok: boolean; user: User }>("/me/avatar", file);
       setAvatarUrl(result.user.avatar_url || "");
@@ -492,7 +527,6 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
 
   async function removePhoto() {
     if (!confirm("Deseja realmente remover sua foto de perfil?")) return;
-
     setBusy(true);
     setError("");
     setSuccess("");
@@ -509,26 +543,17 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
     }
   }
 
-  const initials = user.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join("");
+  const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("");
 
   return (
     <section className="card p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-brand-light font-display text-2xl font-extrabold text-brand">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={`Foto de perfil de ${user.name}`} className="h-full w-full object-cover" />
-          ) : initials}
+          {avatarUrl ? <img src={avatarUrl} alt={`Foto de perfil de ${user.name}`} className="h-full w-full object-cover" /> : initials}
         </div>
-
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold">Foto de perfil</h2>
           <p className="mt-1 text-sm text-ink-soft">Escolha uma foto sua para deixar sua conta mais pessoal e facilitar sua identificação na comunidade.</p>
-
           <div className="mt-4 flex flex-wrap gap-2">
             <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => choosePhoto(e.target.files?.[0])} />
             <button type="button" className="btn-primary" disabled={busy} onClick={() => inputRef.current?.click()}>
@@ -542,10 +567,11 @@ function AvatarEditor({ user, onSaved }: { user: User; onSaved: () => void }) {
           </div>
         </div>
       </div>
-
       {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       {success && <div className="mt-4"><Alert kind="success">{success}</Alert></div>}
-      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">Formatos aceitos: JPG, PNG e WebP. Tamanho máximo: 5 MB. Ao adicionar uma foto, você concorda que ela poderá ficar visível publicamente no Conecta Escola, inclusive no seu perfil profissional.</p>
+      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">
+        Formatos aceitos: JPG, PNG e WebP. Tamanho máximo: 5 MB. Ao adicionar uma foto, você concorda que ela poderá ficar visível publicamente no Conecta Escola, inclusive no seu perfil profissional.
+      </p>
     </section>
   );
 }
@@ -555,15 +581,12 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
   const remaining = Math.max(0, 8 - images.length);
 
   async function uploadPhotos(files: FileList | null) {
     if (!files || files.length === 0) return;
-
     setError("");
     setSuccess("");
-
     const selected = Array.from(files);
 
     if (selected.length > remaining) {
@@ -573,14 +596,12 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
     }
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
     for (const file of selected) {
       if (!allowedTypes.includes(file.type)) {
         setError(`O arquivo "${file.name}" não é JPG, PNG ou WebP.`);
         if (inputRef.current) inputRef.current.value = "";
         return;
       }
-
       if (file.size > 5 * 1024 * 1024) {
         setError(`O arquivo "${file.name}" ultrapassa o limite de 5 MB.`);
         if (inputRef.current) inputRef.current.value = "";
@@ -589,7 +610,6 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
     }
 
     setBusy(true);
-
     try {
       await apiUpload<{ ok: boolean; images: PortfolioImage[] }>("/me/portfolio", selected, "images");
       setSuccess(`${selected.length} ${selected.length === 1 ? "foto adicionada" : "fotos adicionadas"} ao portfólio!`);
@@ -604,7 +624,6 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
 
   async function removePhoto(photo: PortfolioImage) {
     if (!confirm("Deseja realmente remover esta foto do portfólio?")) return;
-
     setBusy(true);
     setError("");
     setSuccess("");
@@ -657,11 +676,12 @@ function PortfolioEditor({ images, onChange }: { images: PortfolioImage[]; onCha
           </button>
         </div>
       )}
-
       {remaining === 0 && <p className="mt-4 text-xs font-medium text-ink-soft">Você atingiu o limite de 8 fotos. Remova alguma imagem para adicionar outra.</p>}
       {error && <div className="mt-4"><Alert>{error}</Alert></div>}
       {success && <div className="mt-4"><Alert kind="success">{success}</Alert></div>}
-      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">São permitidas até 8 imagens. Formatos aceitos: JPG, PNG e WebP. Cada imagem pode ter no máximo 5 MB. As fotos poderão ficar visíveis publicamente no seu perfil profissional.</p>
+      <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-ink-mute">
+        São permitidas até 8 imagens. Formatos aceitos: JPG, PNG e WebP. Cada imagem pode ter no máximo 5 MB. As fotos poderão ficar visíveis publicamente no seu perfil profissional.
+      </p>
     </section>
   );
 }
@@ -675,7 +695,6 @@ function AccountTab({ me, onSaved }: { me: Me; onSaved: () => void }) {
   return (
     <div className="space-y-6">
       <AvatarEditor user={me.user} onSaved={onSaved} />
-
       <div className="grid gap-6 lg:grid-cols-2">
         <form className="card space-y-4 p-6" onSubmit={async (e) => {
           e.preventDefault();
@@ -876,7 +895,11 @@ function ServicesEditor({ services, onChange }: { services: Service[]; onChange:
               </div>
               <div className="flex shrink-0 gap-1">
                 <button className="rounded-full p-2 text-ink-soft hover:bg-cream-2" onClick={() => setEdit(s)} aria-label={`Editar ${s.title}`}><Pencil size={14} /></button>
-                <button className="rounded-full p-2 text-ink-soft hover:bg-red-50 hover:text-red-700" aria-label={`Excluir ${s.title}`} onClick={async () => { if (confirm(`Excluir o serviço "${s.title}"?`)) { await api(`/me/services/${s.id}`, { method: "DELETE" }); onChange(); } }}>
+                <button
+                  className="rounded-full p-2 text-ink-soft hover:bg-red-50 hover:text-red-700"
+                  aria-label={`Excluir ${s.title}`}
+                  onClick={async () => { if (confirm(`Excluir o serviço "${s.title}"?`)) { await api(`/me/services/${s.id}`, { method: "DELETE" }); onChange(); } }}
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -935,7 +958,12 @@ function QuotesTab({ me, onChange }: { me: Me; onChange: () => void }) {
                       <a className="btn btn-sm bg-[#1f9d55] text-white hover:bg-[#188046]" target="_blank" rel="noreferrer" href={whatsappLink(q.family_phone, `Olá, ${q.family_name.split(" ")[0]}! Recebi seu pedido de orçamento pelo Conecta Escola.`)}>WhatsApp</a>
                     )}
                     <a className="btn-ghost btn-sm" href={`mailto:${q.family_email}`}>E-mail</a>
-                    <select aria-label="Situação do pedido" className="input !w-auto !py-1.5 text-xs" value={q.status} onChange={async (e) => { await api(`/me/quotes/${q.id}`, { method: "PATCH", body: { status: e.target.value } }); onChange(); }}>
+                    <select
+                      aria-label="Situação do pedido"
+                      className="input !w-auto !py-1.5 text-xs"
+                      value={q.status}
+                      onChange={async (e) => { await api(`/me/quotes/${q.id}`, { method: "PATCH", body: { status: e.target.value } }); onChange(); }}
+                    >
                       {Object.entries(QUOTE_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
