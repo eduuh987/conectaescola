@@ -26,17 +26,7 @@ const PARTNERSHIPS_DESCRIPTION =
   "Na área de Parcerias, profissionais podem divulgar projetos, encontrar pessoas interessadas em colaborar e formar novas parcerias.";
 
 type NotificationsResponse = {
-  notifications: {
-    id: number;
-    type: string;
-    title: string;
-    message: string;
-    link: string;
-    related_type: string;
-    related_id: number | null;
-    is_read: number;
-    created_at: string;
-  }[];
+  notifications: unknown[];
   unread: number;
 };
 
@@ -44,7 +34,7 @@ function Header() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [unread, setUnread] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const loc = useLocation();
   const nav = useNavigate();
 
@@ -58,9 +48,10 @@ function Header() {
     return () => window.removeEventListener("scroll", on);
   }, []);
 
+  // Consulta as notificações e atualiza o contador automaticamente.
   useEffect(() => {
     if (!user) {
-      setUnread(0);
+      setUnreadNotifications(0);
       return;
     }
 
@@ -68,16 +59,21 @@ function Header() {
 
     const loadNotifications = async () => {
       try {
-        const result = await api<NotificationsResponse>("/me/notifications");
-        if (active) setUnread(Number(result.unread || 0));
+        const data = await api<NotificationsResponse>("/me/notifications");
+
+        if (active) {
+          setUnreadNotifications(Number(data.unread) || 0);
+        }
       } catch {
-        // Mantém o cabeçalho funcionando mesmo se a consulta falhar.
+        // Mantém o menu funcionando mesmo se a consulta falhar.
       }
     };
 
-    loadNotifications();
+    void loadNotifications();
 
-    const interval = window.setInterval(loadNotifications, 30000);
+    const interval = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
 
     return () => {
       active = false;
@@ -95,35 +91,39 @@ function Header() {
       isActive ? "text-brand" : "text-ink-soft"
     }`;
 
+  const notificationLabel =
+    unreadNotifications === 1
+      ? "Você tem 1 notificação não lida"
+      : `Você tem ${unreadNotifications} notificações não lidas`;
+
   const NotificationLink = ({ mobile = false }: { mobile?: boolean }) => (
     <Link
-      to="/minha-conta?aba=orcamentos"
-      aria-label={`Notificações${unread > 0 ? `: ${unread} não lidas` : ""}`}
-      title={unread > 0 ? `${unread} notificações não lidas` : "Notificações"}
+      to="/minha-conta"
       className={
         mobile
-          ? "btn-ghost flex items-center justify-center gap-2"
-          : "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-soft transition hover:bg-cream-2 hover:text-brand"
+          ? "btn-ghost flex items-center justify-between"
+          : "relative inline-flex items-center justify-center rounded-full p-2 text-ink-soft transition hover:bg-cream-2 hover:text-brand"
       }
+      aria-label={unreadNotifications > 0 ? notificationLabel : "Notificações"}
+      title={unreadNotifications > 0 ? notificationLabel : "Notificações"}
     >
-      <Bell size={mobile ? 17 : 18} />
-      {unread > 0 && (
-        <>
-          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 animate-pulse rounded-full bg-red-500 ring-2 ring-cream" />
-          <span className="sr-only">{unread} notificações não lidas</span>
-          {!mobile && (
-            <span className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-              {unread > 99 ? "99+" : unread}
+      <span className="inline-flex items-center gap-2">
+        <span className="relative inline-flex">
+          <Bell size={mobile ? 17 : 19} />
+          {!mobile && unreadNotifications > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">
+              {unreadNotifications > 9 ? "9+" : unreadNotifications}
             </span>
           )}
-          {mobile && (
-            <span className="text-xs font-bold text-red-600">
-              {unread > 99 ? "99+" : unread} não lidas
-            </span>
-          )}
-        </>
+        </span>
+        {mobile && "Notificações"}
+      </span>
+
+      {mobile && unreadNotifications > 0 && (
+        <span className="flex h-5 min-w-5 animate-pulse items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+          {unreadNotifications > 9 ? "9+" : unreadNotifications}
+        </span>
       )}
-      {mobile && unread === 0 && <span>Notificações</span>}
     </Link>
   );
 
@@ -197,8 +197,6 @@ function Header() {
         <div className="hidden items-center gap-3 lg:flex">
           {user ? (
             <>
-              <NotificationLink />
-
               {user.is_admin && (
                 <Link
                   to="/admin"
@@ -207,6 +205,8 @@ function Header() {
                   <Shield size={14} /> Admin
                 </Link>
               )}
+
+              <NotificationLink />
 
               <Link to="/minha-conta" className="btn-primary btn-sm !px-4 !py-2">
                 <UserIcon size={14} /> {user.name.split(" ")[0]}
