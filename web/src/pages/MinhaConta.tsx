@@ -32,7 +32,11 @@ export default function MinhaConta() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("aba") || "conta";
   const me = useApi<Me>("/me");
-  const [wizardStep, setWizardStep] = useState<OnboardingStep>(null);
+
+  const [wizardStep, setWizardStep] = useState<OnboardingStep>(() =>
+    params.get("novo") === "1" && params.get("aba") === "perfil" ? "avatar" : null
+  );
+
   const flowRef = useRef<HTMLDivElement>(null);
   const reload = () => { me.reload(); refresh(); };
 
@@ -44,13 +48,16 @@ export default function MinhaConta() {
 
   if (me.loading && !me.data) return <Spinner />;
   if (me.error || !me.data) return <div className="container-x"><ErrorState error={me.error!} onRetry={me.reload} /></div>;
+
   const d = me.data;
   const isProfessional = !!d.user.is_professional || !!d.profile;
   const isNew = params.get("novo") === "1";
+
   const startProfessionalFlow = () => {
     setParams({ aba: "perfil" });
     setWizardStep("avatar");
   };
+
   const finishProfessionalFlow = () => {
     reload();
     setWizardStep("complete");
@@ -70,7 +77,7 @@ export default function MinhaConta() {
       <h1 className="text-3xl font-extrabold">Olá, {d.user.name.split(" ")[0]}!</h1>
       <StatusCard me={d} onChange={reload} isNew={isNew} />
 
-      {isNew && !isProfessional && !d.user.is_admin && (
+      {isNew && !isProfessional && !d.user.is_admin && !wizardStep && (
         <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-sm sm:p-6">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-extrabold text-sky-800">
@@ -139,6 +146,7 @@ export default function MinhaConta() {
                 </div>
               </section>
             )}
+
             {wizardStep === "profile" && (
               <section className="space-y-5">
                 <WizardProgress step={2} />
@@ -149,6 +157,7 @@ export default function MinhaConta() {
                 <ProfileTab me={d} onSaved={reload} isWizard onNext={() => setWizardStep("portfolio")} />
               </section>
             )}
+
             {wizardStep === "portfolio" && (
               <section className="mx-auto max-w-4xl space-y-5">
                 <WizardProgress step={3} />
@@ -163,6 +172,7 @@ export default function MinhaConta() {
                 </div>
               </section>
             )}
+
             {wizardStep === "complete" && (
               <section className="mx-auto max-w-3xl rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white px-6 py-10 text-center shadow-sm sm:px-10">
                 <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 size={36} /></div>
@@ -176,7 +186,9 @@ export default function MinhaConta() {
                 </div>
               </section>
             )}
+
             {!wizardStep && isProfessional && <ProfileTab me={d} onSaved={reload} />}
+
             {!wizardStep && !isProfessional && (
               <section className="mx-auto max-w-3xl rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-6 shadow-sm sm:p-8">
                 <div className="flex items-start gap-4">
@@ -191,6 +203,7 @@ export default function MinhaConta() {
             )}
           </>
         )}
+
         {tab === "orcamentos" && isProfessional && <QuotesTab me={d} onChange={me.reload} />}
         {tab === "parcerias" && isProfessional && <PartnershipsTab me={d} />}
       </div>
@@ -722,9 +735,11 @@ function ServicesEditor({ services, onChange }: { services: Service[]; onChange:
   const [edit, setEdit] = useState<Service | null>(null);
   const [f, setF] = useState({ title: "", description: "", price: "" });
   const [st, setSt] = useState<{ busy?: boolean; err?: string; fields?: Record<string, string> }>({});
+
   useEffect(() => {
     if (edit) { setF({ title: edit.title, description: edit.description, price: edit.price }); setSt({}); }
   }, [edit]);
+
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between gap-2">
