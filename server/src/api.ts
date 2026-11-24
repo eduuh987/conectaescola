@@ -705,8 +705,12 @@ api.put("/me/profile", requireAuth, h((req, res) => {
         u.id, uniqueSlug(b.display_name, "professional_profiles"), b.display_name, b.profession, b.category_id, b.bio, b.experience,
         b.city, b.neighborhood, b.service_area, b.whatsapp, b.contact_hours, b.price_range, b.published ? 1 : 0
       );
-      run("UPDATE users SET is_professional = 1 WHERE id = ?", u.id);
     }
+
+    run(
+      "UPDATE users SET is_professional = 1, updated_at = datetime('now') WHERE id = ?",
+      u.id
+    );
   });
   res.json({ ok: true });
 }));
