@@ -170,6 +170,23 @@ const migrations: string[] = [
   );
   CREATE INDEX idx_portfolio_images_profile ON portfolio_images(profile_id);
   `,
+  `
+  CREATE TABLE notifications (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'general',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL DEFAULT '',
+    link TEXT NOT NULL DEFAULT '',
+    related_type TEXT NOT NULL DEFAULT '',
+    related_id INTEGER,
+    is_read INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX idx_notifications_user ON notifications(user_id);
+  CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+  CREATE INDEX idx_notifications_created ON notifications(created_at);
+  `,
 ];
 
 db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))");
@@ -236,11 +253,11 @@ export function seed() {
     const school = db.prepare("SELECT id FROM schools ORDER BY id LIMIT 1").get() as { id: number };
 
     db.prepare(
-      `INSERT INTO users (name, email, password_hash, school_id, is_admin, status, consent_at)
-       VALUES ('Administrador', ?, ?, ?, 1, 'approved', datetime('now'))`
+      \`INSERT INTO users (name, email, password_hash, school_id, is_admin, status, consent_at)
+       VALUES ('Administrador', ?, ?, ?, 1, 'approved', datetime('now'))\`
     ).run(email, bcrypt.hashSync(password, 10));
 
-    console.log(`[seed] administrador criado: ${email} (troque a senha em Minha conta)`);
+    console.log(\`[seed] administrador criado: \${email} (troque a senha em Minha conta)\`);
   }
 }
 
