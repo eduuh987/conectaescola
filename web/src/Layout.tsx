@@ -1,8 +1,17 @@
 
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ArrowUpRight, ChevronDown, LogOut, Menu, Shield, User as UserIcon, X } from "lucide-react";
-import { useAuth, useSite } from "./lib";
+import {
+  ArrowUpRight,
+  Bell,
+  ChevronDown,
+  LogOut,
+  Menu,
+  Shield,
+  User as UserIcon,
+  X,
+} from "lucide-react";
+import { api, useAuth, useSite } from "./lib";
 import { Logo } from "./ui";
 
 const NAV = [
@@ -16,10 +25,26 @@ const NAV = [
 const PARTNERSHIPS_DESCRIPTION =
   "Na área de Parcerias, profissionais podem divulgar projetos, encontrar pessoas interessadas em colaborar e formar novas parcerias.";
 
+type NotificationsResponse = {
+  notifications: {
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    link: string;
+    related_type: string;
+    related_id: number | null;
+    is_read: number;
+    created_at: string;
+  }[];
+  unread: number;
+};
+
 function Header() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [unread, setUnread] = useState(0);
   const loc = useLocation();
   const nav = useNavigate();
 
@@ -33,6 +58,33 @@ function Header() {
     return () => window.removeEventListener("scroll", on);
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      setUnread(0);
+      return;
+    }
+
+    let active = true;
+
+    const loadNotifications = async () => {
+      try {
+        const result = await api<NotificationsResponse>("/me/notifications");
+        if (active) setUnread(Number(result.unread || 0));
+      } catch {
+        // Mantém o cabeçalho funcionando mesmo se a consulta falhar.
+      }
+    };
+
+    loadNotifications();
+
+    const interval = window.setInterval(loadNotifications, 30000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [user?.id]);
+
   const doLogout = async () => {
     await logout();
     nav("/");
@@ -42,6 +94,38 @@ function Header() {
     `text-[13px] font-medium transition hover:text-brand ${
       isActive ? "text-brand" : "text-ink-soft"
     }`;
+
+  const NotificationLink = ({ mobile = false }: { mobile?: boolean }) => (
+    <Link
+      to="/minha-conta?aba=orcamentos"
+      aria-label={`Notificações${unread > 0 ? `: ${unread} não lidas` : ""}`}
+      title={unread > 0 ? `${unread} notificações não lidas` : "Notificações"}
+      className={
+        mobile
+          ? "btn-ghost flex items-center justify-center gap-2"
+          : "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-soft transition hover:bg-cream-2 hover:text-brand"
+      }
+    >
+      <Bell size={mobile ? 17 : 18} />
+      {unread > 0 && (
+        <>
+          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 animate-pulse rounded-full bg-red-500 ring-2 ring-cream" />
+          <span className="sr-only">{unread} notificações não lidas</span>
+          {!mobile && (
+            <span className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+          {mobile && (
+            <span className="text-xs font-bold text-red-600">
+              {unread > 99 ? "99+" : unread} não lidas
+            </span>
+          )}
+        </>
+      )}
+      {mobile && unread === 0 && <span>Notificações</span>}
+    </Link>
+  );
 
   return (
     <header
@@ -72,9 +156,7 @@ function Header() {
                   />
                 </NavLink>
 
-                <div
-                  className="invisible absolute left-1/2 top-full z-[100] w-80 -translate-x-1/2 -translate-y-2 pt-2 opacity-0 transition-all duration-300 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                >
+                <div className="invisible absolute left-1/2 top-full z-[100] w-80 -translate-x-1/2 -translate-y-2 pt-2 opacity-0 transition-all duration-300 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
                   <div className="rounded-2xl border border-line bg-white p-5 text-left shadow-xl">
                     <div className="mb-3 flex items-center gap-2">
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
@@ -115,6 +197,8 @@ function Header() {
         <div className="hidden items-center gap-3 lg:flex">
           {user ? (
             <>
+              <NotificationLink />
+
               {user.is_admin && (
                 <Link
                   to="/admin"
@@ -123,9 +207,11 @@ function Header() {
                   <Shield size={14} /> Admin
                 </Link>
               )}
+
               <Link to="/minha-conta" className="btn-primary btn-sm !px-4 !py-2">
                 <UserIcon size={14} /> {user.name.split(" ")[0]}
               </Link>
+
               <button
                 onClick={doLogout}
                 className="rounded-full p-2 text-ink-soft hover:bg-cream-2"
@@ -195,14 +281,18 @@ function Header() {
             <div className="mt-2 flex flex-col gap-2 border-t border-line pt-4">
               {user ? (
                 <>
+                  <NotificationLink mobile />
+
                   {user.is_admin && (
                     <Link to="/admin" className="btn-ghost">
                       Administração
                     </Link>
                   )}
+
                   <Link to="/minha-conta" className="btn-primary">
                     Minha conta
                   </Link>
+
                   <button onClick={doLogout} className="btn-ghost">
                     Sair
                   </button>
