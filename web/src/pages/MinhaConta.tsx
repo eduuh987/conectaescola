@@ -186,7 +186,11 @@ export default function MinhaConta() {
 
   const d = me.data;
 
-  const isProfessional = !!d.user.is_professional || !!d.profile;
+  const isProfessional =
+    !!d.user.is_professional ||
+    !!d.profile ||
+    wizardStep === "portfolio" ||
+    wizardStep === "complete";
 
   const isNew = params.get("novo") === "1";
 
