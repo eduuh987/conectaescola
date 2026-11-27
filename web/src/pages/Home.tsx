@@ -24,29 +24,32 @@ export default function Home() {
   const [q, setQ] = useState("");
   const cats = useApi<Cat[]>("/categories");
   const pros = useApi<{ items: ProCard[] }>("/professionals?ordem=recentes");
-  const schoolName = "E.E Vila São Joaquim II";
+  const schoolName = school?.name || "E.E Vila São Joaquim II";
 
   return (
     <>
       {/* Apresentação principal */}
-      <section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-cream to-brand-50">
-        <div className="pointer-events-none absolute -right-32 -top-32 -z-10 h-96 w-96 rounded-full bg-blue-100/70 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-40 -left-20 -z-10 h-80 w-80 rounded-full bg-sky-100/60 blur-3xl" />
+      <section className="relative overflow-hidden border-b border-line bg-white">
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[480px] w-[480px] rounded-full bg-brand-50/70" />
+        <div className="pointer-events-none absolute -bottom-48 left-1/3 h-80 w-80 rounded-full bg-sky-50/80" />
 
-        <div className="container-x grid items-center gap-12 py-16 sm:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:py-28">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-brand/10 bg-white px-4 py-2 text-xs font-bold text-brand shadow-sm">
-              <Sparkles size={14} />
+        <div className="container-x relative grid items-center gap-12 py-16 sm:py-20 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16 lg:py-24">
+          <div className="relative z-10">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-brand">
+              <span className="h-2 w-2 rounded-full bg-brand" />
               Da escola para a comunidade
             </span>
 
-            <h1 className="mt-7 max-w-2xl text-4xl font-extrabold leading-[1.08] tracking-tight text-ink sm:text-5xl lg:text-[60px]">
+            <h1 className="mt-6 max-w-2xl text-5xl font-extrabold leading-[1.04] tracking-tight text-ink sm:text-6xl lg:text-[66px]">
               Conexões que aproximam.
-              <span className="mt-1 block text-brand">Oportunidades que transformam.</span>
+              <span className="mt-2 block text-brand">
+                Oportunidades que transformam.
+              </span>
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
-              O Conecta Escola aproxima famílias e profissionais da comunidade de {schoolName}, criando oportunidades e fortalecendo relações.
+              O Conecta Escola aproxima famílias e profissionais da comunidade
+              de {schoolName}, criando oportunidades e fortalecendo relações.
             </p>
 
             <form
@@ -54,7 +57,7 @@ export default function Home() {
                 e.preventDefault();
                 nav(`/profissionais${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`);
               }}
-              className="mt-8 flex max-w-[520px] items-center gap-2 rounded-2xl border border-line bg-white p-2 pl-4 shadow-pop"
+              className="mt-8 flex max-w-[540px] items-center gap-2 rounded-xl border border-line bg-white p-2 pl-4 shadow-card transition focus-within:border-brand/40 focus-within:shadow-pop"
               role="search"
             >
               <Search size={19} className="shrink-0 text-ink-mute" />
@@ -68,7 +71,7 @@ export default function Home() {
                 placeholder="O que você está procurando?"
                 className="min-w-0 flex-1 bg-transparent py-2.5 text-sm outline-none placeholder:text-ink-mute"
               />
-              <button className="btn-primary !rounded-xl !px-5 !py-3">
+              <button className="btn-primary !rounded-lg !px-5 !py-3">
                 Buscar <ArrowRight size={15} />
               </button>
             </form>
@@ -89,50 +92,67 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Destaque visual */}
-          <div className="relative mx-auto w-full max-w-[430px] lg:ml-auto">
-            <div className="absolute -right-5 -top-5 h-28 w-28 rounded-full border-[18px] border-blue-100/70" />
-            <div className="absolute -bottom-6 -left-5 h-32 w-32 rounded-full bg-sky-100/70 blur-xl" />
-
-            <div className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-brand to-blue-800 p-6 shadow-pop sm:p-8">
-              <div className="dots absolute inset-0 opacity-60" />
-
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15 text-white">
-                    <HeartHandshake size={25} />
-                  </div>
-                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                    Nossa comunidade
-                  </span>
-                </div>
-
-                <div className="mt-10 rounded-2xl bg-white p-6 shadow-card">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand">
-                    {schoolName}
-                  </p>
-                  <h2 className="mt-3 font-display text-2xl font-extrabold leading-tight text-ink">
-                    Um lugar para conectar pessoas e oportunidades.
-                  </h2>
-                  <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-                    Famílias, escola e profissionais construindo uma rede de apoio e colaboração.
-                  </p>
-
-                  <div className="mt-6 flex items-center gap-3 border-t border-line pt-5">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand">
-                      <Users size={19} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-ink">Juntos somos mais fortes</p>
-                      <p className="text-xs text-ink-soft">Uma comunidade conectada.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="mt-5 text-center text-xs font-medium text-white/80">
-                  ConectaEscola · Conectando nossa comunidade
+          {/* Prévia dos profissionais da comunidade */}
+          <div className="relative z-10 mx-auto w-full max-w-[490px] lg:ml-auto">
+            <div className="mb-6 flex items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow mb-2">Conheça a nossa rede</p>
+                <h2 className="text-2xl font-extrabold leading-tight text-ink sm:text-3xl">
+                  Pessoas que fazem parte da comunidade.
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                  Profissionais locais, talentos e serviços próximos de você.
                 </p>
               </div>
+              <Link
+                to="/profissionais"
+                aria-label="Ver todos os profissionais"
+                className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line bg-white text-brand transition hover:border-brand hover:bg-brand-50"
+              >
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+
+            {pros.data?.items && pros.data.items.length > 0 ? (
+              <div className="grid gap-4">
+                {pros.data.items.slice(0, 2).map((p) => (
+                  <ProfessionalCard key={p.id} p={p} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-line bg-cream p-6 sm:p-7">
+                <div className="flex items-start gap-4">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand">
+                    <Users size={23} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-ink">
+                      Uma comunidade cheia de possibilidades.
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                      Encontre profissionais, conheça serviços e descubra
+                      novas oportunidades dentro da rede escolar.
+                    </p>
+                    <Link
+                      to="/profissionais"
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
+                    >
+                      Conhecer a rede <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center gap-3 border-t border-line pt-5">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-50 text-brand">
+                <GraduationCap size={20} />
+              </div>
+              <p className="text-xs leading-relaxed text-ink-soft">
+                <span className="font-bold text-ink">{schoolName}</span>
+                <br />
+                Conectando escola, famílias e comunidade.
+              </p>
             </div>
           </div>
         </div>
@@ -216,7 +236,8 @@ export default function Home() {
                 </h2>
 
                 <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
-                  Crie seu perfil, apresente seus serviços e conecte-se com famílias e oportunidades da comunidade escolar.
+                  Crie seu perfil, apresente seus serviços e conecte-se com
+                  famílias e oportunidades da comunidade escolar.
                 </p>
               </div>
 
@@ -240,7 +261,8 @@ export default function Home() {
               Uma rede feita para aproximar
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-ink-soft sm:text-base">
-              O ConectaEscola facilita o contato entre pessoas da comunidade escolar e ajuda a criar novas oportunidades.
+              O ConectaEscola facilita o contato entre pessoas da comunidade
+              escolar e ajuda a criar novas oportunidades.
             </p>
           </div>
 
@@ -251,7 +273,8 @@ export default function Home() {
               </div>
               <h3 className="mt-5 text-lg font-bold text-ink">Para as famílias</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                Encontre profissionais e serviços indicados dentro da rede da comunidade escolar.
+                Encontre profissionais e serviços indicados dentro da rede da
+                comunidade escolar.
               </p>
             </div>
 
@@ -261,7 +284,8 @@ export default function Home() {
               </div>
               <h3 className="mt-5 text-lg font-bold text-ink">Para profissionais</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                Apresente seu trabalho, divulgue seus serviços e encontre novas oportunidades.
+                Apresente seu trabalho, divulgue seus serviços e encontre novas
+                oportunidades.
               </p>
             </div>
 
@@ -271,7 +295,8 @@ export default function Home() {
               </div>
               <h3 className="mt-5 text-lg font-bold text-ink">Para a escola</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                Fortaleça os vínculos com as famílias e incentive a colaboração na comunidade.
+                Fortaleça os vínculos com as famílias e incentive a colaboração
+                na comunidade.
               </p>
             </div>
           </div>
